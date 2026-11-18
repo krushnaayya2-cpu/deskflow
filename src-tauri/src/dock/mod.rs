@@ -4,24 +4,21 @@
 //! - `dock-N`: transparent webview drawing icons, menus and tooltips. It is
 //!   larger than the bar (room for magnified icons and menus) and
 //!   click-through outside the bar (see `overlay`).
-//! - `dockbg-N`: a plain native window with real Windows acrylic blur,
-//!   sized and rounded to match the bar exactly, placed just under `dock-N`.
+//! - a small native Win32 window with real acrylic blur (`glass`), sized
+//!   and rounded to match the bar exactly, placed just under `dock-N`.
 //!   Used only by designs that have a glass bar.
 
 pub mod apps;
+mod glass;
 pub mod icons;
 pub mod taskbar;
 
 use crate::config::{Config, ConfigStore, DockBackground, DockDesign, DockPosition, DockTheme, IslandMonitor, PinnedApp};
 use crate::overlay::{self, HitRect};
-use std::sync::Mutex;
-use tauri::{
-    window::{Color, Effect, EffectsBuilder},
-    AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder, Window,
-};
+use std::{collections::HashMap, sync::Mutex};
+use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 pub const LABEL_PREFIX: &str = "dock-";
-const BG_PREFIX: &str = "dockbg-";
 /// Room (logical px) the dock window keeps above/beside the bar for
 /// magnified icons, tooltips and menus.
 const DOCK_DEPTH: f64 = 320.0;
@@ -29,6 +26,8 @@ const DOCK_DEPTH: f64 = 320.0;
 #[derive(Default)]
 pub struct DockState {
     layout: Mutex<Option<(IslandMonitor, DockPosition, bool)>>,
+    /// Native glass window per dock window label.
+    glass: Mutex<HashMap<String, isize>>,
 }
 
 fn dock_windows(app: &AppHandle) -> Vec<WebviewWindow> {
@@ -37,10 +36,6 @@ fn dock_windows(app: &AppHandle) -> Vec<WebviewWindow> {
         .filter(|(l, _)| l.starts_with(LABEL_PREFIX))
         .map(|(_, w)| w)
         .collect()
-}
-
-fn bg_for(app: &AppHandle, dock_label: &str) -> Option<Window> {
-    app.get_window(&dock_label.replacen(LABEL_PREFIX, BG_PREFIX, 1))
 }
 
 pub fn init(app: &AppHandle, cfg: &Config) {
@@ -71,10 +66,10 @@ pub fn sync(app: &AppHandle, cfg: &Config) {
     if *layout == wanted {
         return;
     }
+    for (_, h) in state.glass.lock().unwrap().drain() {
+        glass::destroy(h);
+    }
     for w in dock_windows(app) {
-        if let Some(bg) = bg_for(app, w.label()) {
-            let _ = bg.destroy();
-        }
         overlay::forget(app, w.label());
         let _ = w.destroy();
     }
@@ -117,27 +112,14 @@ fn create(app: &AppHandle, i: usize, m: &tauri::Monitor, pos: DockPosition, full
         ),
     };
 
-    // Background (blur) window first so the dock window ends up above it.
-    let bg = tauri::window::WindowBuilder::new(app, format!("{BG_PREFIX}{i}"))
-        .title("DeskFlow Dock Glass")
-        .transparent(true)
-        .decorations(false)
-        .shadow(false)
-        .always_on_top(true)
-        .skip_taskbar(true)
-        .resizable(false)
-        .focused(false)
-        .visible(false)
-        .build()?;
-    let _ = bg.set_ignore_cursor_events(true);
-    #[cfg(windows)]
-    if let Ok(h) = bg.hwnd() {
-        overlay::no_activate_hwnd(h.0 as isize);
+    if let Some(h) = glass::create() {
+        app.state::<DockState>().glass.lock().unwrap().insert(format!("{LABEL_PREFIX}{i}"), h);
     }
 
     let label = format!("{LABEL_PREFIX}{i}");
     let win = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("dock.html".into()))
         .title("DeskFlow Dock")
+        .inner_size(w as f64 / scale, h as f64 / scale)
         .transparent(true)
         .decorations(false)
         .shadow(false)
@@ -200,28 +182,34 @@ fn wants_blur(cfg: &Config) -> bool {
 /// so the blur window can be placed and rounded to match.
 #[tauri::command]
 pub fn dock_set_bar(app: AppHandle, window: WebviewWindow, rect: Option<HitRect>, radius: f64) -> Result<(), String> {
-    let Some(bg) = bg_for(&app, window.label()) else { return Ok(()) };
+    let Some(glass_hwnd) = app.state::<DockState>().glass.lock().unwrap().get(window.label()).copied() else {
+        return Ok(());
+    };
     let cfg = app.state::<ConfigStore>().get();
     let Some(r) = rect.filter(|_| wants_blur(&cfg)) else {
-        let _ = bg.hide();
+        glass::hide(glass_hwnd);
         return Ok(());
     };
     let scale = window.scale_factor().map_err(|e| e.to_string())?;
     let origin = window.outer_position().map_err(|e| e.to_string())?;
-    let (w, h) = ((r.w * scale).round() as u32, (r.h * scale).round() as u32);
-    bg.set_size(PhysicalSize::new(w, h)).map_err(|e| e.to_string())?;
-    bg.set_position(PhysicalPosition::new(origin.x + (r.x * scale) as i32, origin.y + (r.y * scale) as i32))
-        .map_err(|e| e.to_string())?;
-
     // Tint: dark or light following the app theme; more blur = less tint.
     let dark = !matches!(cfg.appearance.theme, crate::config::ThemeMode::Light);
     let (cr, cg, cb) = if dark { (18, 18, 26) } else { (245, 245, 250) };
     let tint = ((100 - cfg.dock.style.blur) as f64 * 1.6 + 20.0).min(220.0) as u8;
-    bg.set_effects(EffectsBuilder::new().effect(Effect::Acrylic).color(Color(cr, cg, cb, tint)).build())
-        .map_err(|e| e.to_string())?;
-    platform::round_and_order(&bg, &window, w, h, (radius * scale) as i32);
-    bg.show().map_err(|e| e.to_string())?;
-    let _ = bg.set_ignore_cursor_events(true);
+    #[cfg(windows)]
+    let above = window.hwnd().map(|h| h.0 as isize).unwrap_or(0);
+    #[cfg(not(windows))]
+    let above = 0;
+    glass::show(
+        glass_hwnd,
+        above,
+        origin.x + (r.x * scale).round() as i32,
+        origin.y + (r.y * scale).round() as i32,
+        (r.w * scale).round() as i32,
+        (r.h * scale).round() as i32,
+        (radius * scale).round() as i32,
+        (cr, cg, cb, tint),
+    );
     Ok(())
 }
 
@@ -319,32 +307,4 @@ pub async fn dock_import_theme(app: AppHandle) -> Result<Option<DockTheme>, Stri
 fn sanitize(name: &str) -> String {
     let s: String = name.chars().map(|c| if c.is_alphanumeric() || c == '-' || c == ' ' { c } else { '_' }).collect();
     if s.trim().is_empty() { "theme".into() } else { s.trim().to_string() }
-}
-
-#[cfg(windows)]
-mod platform {
-    use tauri::{WebviewWindow, Window};
-    use windows::Win32::{
-        Foundation::HWND,
-        Graphics::Gdi::{CreateRoundRectRgn, SetWindowRgn},
-        UI::WindowsAndMessaging::{SetWindowPos, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE},
-    };
-
-    /// Clip the blur window to the bar's rounded shape and keep it directly
-    /// under the dock window.
-    pub fn round_and_order(bg: &Window, dock: &WebviewWindow, w: u32, h: u32, radius: i32) {
-        let (Ok(b), Ok(d)) = (bg.hwnd(), dock.hwnd()) else { return };
-        let (b, d) = (HWND(b.0 as _), HWND(d.0 as _));
-        unsafe {
-            let rgn = CreateRoundRectRgn(0, 0, w as i32 + 1, h as i32 + 1, radius * 2, radius * 2);
-            SetWindowRgn(b, Some(rgn), true);
-            let _ = SetWindowPos(b, Some(d), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-        }
-    }
-}
-
-#[cfg(not(windows))]
-mod platform {
-    use tauri::{WebviewWindow, Window};
-    pub fn round_and_order(_bg: &Window, _dock: &WebviewWindow, _w: u32, _h: u32, _radius: i32) {}
 }

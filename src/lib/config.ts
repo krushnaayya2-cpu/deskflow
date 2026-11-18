@@ -18,6 +18,49 @@ export interface IslandConfig {
   activities: Record<IslandActivity, boolean>;
 }
 
+export type DockDesign = "glass" | "minimal" | "neon" | "classic" | "pills" | "win11";
+export type DockPosition = "bottom" | "left" | "right";
+
+export interface DockStyle {
+  design: DockDesign;
+  background: "glass" | "solid" | "transparent";
+  iconSize: number;
+  spacing: number;
+  cornerRadius: number;
+  blur: number;
+  opacity: number;
+  accent: string | null;
+  magnification: number;
+  position: DockPosition;
+  autoHide: boolean;
+}
+
+export interface PinnedApp {
+  name: string;
+  path: string;
+  target: string;
+  args: string;
+}
+
+export interface DockTheme {
+  name: string;
+  style: DockStyle;
+}
+
+export interface DockConfig {
+  enabled: boolean;
+  monitor: "primary" | "all";
+  style: DockStyle;
+  showRunning: boolean;
+  showStart: boolean;
+  showClock: boolean;
+  hideTaskbar: boolean;
+  pinned: PinnedApp[];
+  pinsImported: boolean;
+  themes: DockTheme[];
+  originalTaskbarAutohide: boolean | null;
+}
+
 export interface Config {
   version: number;
   general: {
@@ -29,6 +72,7 @@ export interface Config {
     accent: string;
   };
   island: IslandConfig;
+  dock: DockConfig;
 }
 
 export interface AppInfo {

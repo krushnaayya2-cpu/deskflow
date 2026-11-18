@@ -4,7 +4,8 @@
   "description": "Permissions for DeskFlow's own windows (settings, Dynamic Island). DeskFlow's commands are allowed by default; plugins are driven from Rust, so the UI only gets core events and window access.",
   "windows": [
     "settings",
-    "island-*"
+    "island-*",
+    "dock-*"
   ],
   "permissions": [
     "core:default"

@@ -10,7 +10,7 @@ Built with **Tauri 2** (Rust + React/TypeScript + Tailwind). No Electron, no tel
 |---|---|---|
 | 1 | Project setup, tray app, settings, autostart, global hotkey | ✅ Done |
 | 3 | Dynamic Island (built early, on request) | ✅ Done |
-| 2 | Glass dock and theme system | Next |
+| 2 | Glass dock and theme system | ✅ Done |
 | 4 | Hover-to-convert circle menu and conversion engine | Planned |
 | 5 | Desktop organizer | Planned |
 | 6 | AI spotlight and notifications | Planned |
@@ -23,6 +23,18 @@ Built with **Tauri 2** (Rust + React/TypeScript + Tailwind). No Electron, no tel
 - **Start with Windows** is on by default. When launched at sign-in, DeskFlow starts silently in the tray.
 - Closing the settings window keeps DeskFlow running. Use *Quit DeskFlow* in the tray menu to exit.
 - Launching DeskFlow a second time just brings up the settings window of the running copy.
+
+## Dock
+
+A dock with your pinned and running apps that can replace the Windows taskbar.
+
+- Six designs: **Glass** (real Windows acrylic blur), **Minimal**, **Neon**, **Classic bar**, **Floating pills** and **Windows 11**.
+- Pinned apps are imported from your taskbar on first run. Running apps show an indicator (focused app highlighted).
+- Click to open/focus (click again to minimise, or cycle windows), middle-click for a new window, right-click for Show / New window / Pin / Show in folder / Close. Drag icons to reorder pinned apps.
+- macOS-style magnification and a launch bounce.
+- Settings → *Dock*: icon size, spacing, corner radius, blur strength, opacity, accent, magnification, glass/solid/transparent background, bottom/left/right, auto-hide, main or all displays, Start button, clock, running apps, add apps from the Start menu.
+- **Hide the Windows taskbar** (optional). DeskFlow restores it, with its original auto-hide setting, when you turn the option off or quit.
+- Themes: six presets, save your own, and export/import themes as `.json` files.
 
 ## Dynamic Island
 

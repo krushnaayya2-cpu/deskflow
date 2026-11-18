@@ -1,6 +1,6 @@
 [package]
 name = "deskflow"
-version = "0.2.0"
+version = "0.3.0"
 description = "DeskFlow - desktop organizer, glass dock, Dynamic Island and file converter for Windows 11"
 edition = "2021"
 rust-version = "1.80"
@@ -14,7 +14,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon", "image-png", "unstable"] }
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-autostart = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-single-instance = "2"
@@ -37,6 +37,7 @@ windows = { version = "0.62", features = [
   "Win32_Graphics_Gdi",
   "Win32_Storage_FileSystem",
   "Win32_System_Com",
+  "Win32_System_LibraryLoader",
   "Win32_System_Power",
   "Win32_System_Threading",
   "Win32_UI_Controls",

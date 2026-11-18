@@ -172,3 +172,35 @@ export function AccentPicker(props: { value: string; onChange: (hex: string) => 
     </div>
   );
 }
+
+/** Labelled range slider showing its current value. */
+export function Slider(props: {
+  id: string;
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  unit?: string;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <input
+        id={props.id}
+        type="range"
+        aria-label={props.label}
+        min={props.min}
+        max={props.max}
+        step={props.step ?? 1}
+        value={props.value}
+        onChange={(e) => props.onChange(Number(e.target.value))}
+        className="w-40 accent-[var(--accent)]"
+      />
+      <span className="w-14 text-right font-mono text-[12.5px] text-muted tabular-nums">
+        {props.value}
+        {props.unit ?? ""}
+      </span>
+    </div>
+  );
+}
