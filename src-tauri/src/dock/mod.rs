@@ -173,7 +173,9 @@ pub fn restore_taskbar(app: &AppHandle) {
 /// Does this design draw a glass bar that should get real blur?
 fn wants_blur(cfg: &Config) -> bool {
     let s = &cfg.dock.style;
-    s.background == DockBackground::Glass && s.blur > 0 && s.design != DockDesign::Pills
+    s.background == DockBackground::Glass
+        && s.blur > 0
+        && !matches!(s.design, DockDesign::Pills | DockDesign::Split | DockDesign::Underline | DockDesign::Tiles)
 }
 
 // ---- Commands -------------------------------------------------------------
@@ -247,6 +249,12 @@ pub fn dock_close(key: String) -> Result<(), String> {
 #[tauri::command]
 pub fn dock_start_menu() {
     apps::open_start_menu();
+}
+
+/// Open Windows Search, Quick Settings or the calendar/notification panel.
+#[tauri::command]
+pub fn dock_shell(which: String) {
+    apps::shell_shortcut(&which);
 }
 
 /// Start-menu apps for the "Add app" picker.

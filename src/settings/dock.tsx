@@ -1,28 +1,37 @@
 // Settings → Dock: design, look, behaviour, pinned apps and themes.
 import { useEffect, useMemo, useState } from "react";
-import type { DockDesign, DockStyle, DockTheme, PinnedApp } from "../lib/config";
+import type { DockDesign, DockStyle, DockTheme, IconStyle, PinnedApp } from "../lib/config";
 import { exportTheme, importTheme, installedApps, makePin } from "../lib/dock";
-import { DOCK_DESIGNS, dockLook } from "../dock/designs";
+import { DOCK_DESIGNS, dockLook, itemStyle } from "../dock/designs";
 import { AccentPicker, Row, Segmented, Slider, Toggle } from "./controls";
 import type { SectionProps } from "./sections";
 
-/** Ready-made looks, one per design, as a starting point. */
-const PRESETS: DockTheme[] = DOCK_DESIGNS.map((d) => ({
-  name: d.label,
-  style: {
-    design: d.id,
-    background: "glass",
-    iconSize: d.id === "classic" || d.id === "win11" ? 36 : 48,
-    spacing: d.id === "pills" ? 10 : d.id === "win11" ? 6 : 8,
-    cornerRadius: d.id === "minimal" ? 14 : d.id === "neon" ? 20 : 22,
-    blur: 70,
-    opacity: d.id === "minimal" ? 80 : 60,
-    accent: null,
-    magnification: d.id === "classic" || d.id === "win11" ? 100 : 160,
-    position: "bottom",
-    autoHide: false,
-  },
-}));
+/** Ready-made looks: one per design, plus a few named combinations. */
+const base: DockStyle = {
+  design: "glass", background: "glass", iconSize: 48, spacing: 8, cornerRadius: 22, blur: 70, opacity: 60,
+  accent: null, magnification: 160, position: "bottom", autoHide: false, iconStyle: "original", separators: false,
+};
+const PRESETS: DockTheme[] = [
+  ...DOCK_DESIGNS.map((d) => ({
+    name: d.label,
+    style: {
+      ...base,
+      design: d.id,
+      iconSize: ["classic", "win11", "underline", "split"].includes(d.id) ? 36 : d.id === "tab" || d.id === "rail" ? 40 : 48,
+      spacing: d.id === "pills" || d.id === "tiles" ? 12 : d.id === "win11" ? 6 : 10,
+      cornerRadius: d.id === "minimal" ? 14 : d.id === "rail" ? 4 : 22,
+      opacity: d.id === "minimal" ? 80 : 60,
+      magnification: ["classic", "win11", "underline", "split", "rail"].includes(d.id) ? 100 : 160,
+      separators: d.id === "rail",
+    },
+  })),
+  { name: "Onyx", style: { ...base, design: "tab", background: "solid", iconSize: 34, spacing: 22, cornerRadius: 18, opacity: 95, accent: "#60a5fa", iconStyle: "silhouette", magnification: 120 } },
+  { name: "Silver", style: { ...base, design: "tab", background: "glass", iconSize: 36, spacing: 20, cornerRadius: 20, opacity: 80, iconStyle: "mono", magnification: 120 } },
+  { name: "Indigo outline", style: { ...base, design: "minimal", background: "solid", iconSize: 32, spacing: 20, cornerRadius: 22, opacity: 70, accent: "#ffffff", iconStyle: "silhouette", magnification: 130 } },
+  { name: "Night shelf", style: { ...base, design: "glass", background: "solid", iconSize: 32, spacing: 14, cornerRadius: 16, opacity: 85, magnification: 100 } },
+  { name: "Dusk pebble", style: { ...base, design: "pebble", iconSize: 40, spacing: 12, cornerRadius: 26, magnification: 130 } },
+  { name: "Sage capsules", style: { ...base, design: "split", iconSize: 36, spacing: 12, cornerRadius: 24, opacity: 55, magnification: 100 } },
+];
 
 export function DockSection({ config, update }: SectionProps) {
   const dock = config.dock;
@@ -54,6 +63,14 @@ export function DockSection({ config, update }: SectionProps) {
         <Row label="Blur strength" description="0 turns the blur off." htmlFor="d-blur"><Slider id="d-blur" label="Blur strength" min={0} max={100} value={st.blur} unit="%" onChange={(v) => setStyle({ blur: v })} /></Row>
         <Row label="Opacity" htmlFor="d-op"><Slider id="d-op" label="Opacity" min={0} max={100} value={st.opacity} unit="%" onChange={(v) => setStyle({ opacity: v })} /></Row>
         <Row label="Magnification" description="How much icons grow under the cursor. 100% is off." htmlFor="d-mag"><Slider id="d-mag" label="Magnification" min={100} max={250} step={5} value={st.magnification} unit="%" onChange={(v) => setStyle({ magnification: v })} /></Row>
+        <Row label="Icon style" description="Silhouette tints every icon with the accent colour.">
+          <Segmented<IconStyle> label="Icon style" value={st.iconStyle}
+            options={[{ value: "original", label: "Original" }, { value: "mono", label: "Mono" }, { value: "silhouette", label: "Silhouette" }]}
+            onChange={(v) => setStyle({ iconStyle: v })} />
+        </Row>
+        <Row label="Dividers between icons" htmlFor="d-sep">
+          <Toggle id="d-sep" label="Dividers between icons" checked={st.separators} onChange={(v) => setStyle({ separators: v })} />
+        </Row>
         <Row label="Accent colour" description={st.accent ? "Custom for the dock." : "Following the app accent."}>
           <div className="flex items-center gap-3">
             <AccentPicker value={accent} onChange={(hex) => setStyle({ accent: hex })} />
@@ -86,7 +103,13 @@ export function DockSection({ config, update }: SectionProps) {
         <Row label="Show Start button" htmlFor="d-start">
           <Toggle id="d-start" label="Show Start button" checked={dock.showStart} onChange={(v) => setDock({ showStart: v })} />
         </Row>
-        <Row label="Show clock" description="On the Classic and Windows 11 designs." htmlFor="d-clock">
+        <Row label="Show Search button" description="Opens Windows Search." htmlFor="d-search">
+          <Toggle id="d-search" label="Show Search button" checked={dock.showSearch} onChange={(v) => setDock({ showSearch: v })} />
+        </Row>
+        <Row label="Show system tray" description="Wi-Fi, volume and battery. Click to open Quick Settings." htmlFor="d-tray">
+          <Toggle id="d-tray" label="Show system tray" checked={dock.showTray} onChange={(v) => setDock({ showTray: v })} />
+        </Row>
+        <Row label="Show clock" description="Click it to open the calendar and notifications." htmlFor="d-clock">
           <Toggle id="d-clock" label="Show clock" checked={dock.showClock} onChange={(v) => setDock({ showClock: v })} />
         </Row>
 
@@ -112,7 +135,7 @@ function DesignGrid(props: { value: DockDesign; style: DockStyle; accent: string
   return (
     <div className="rounded-xl border border-line bg-panel p-4">
       <p className="mb-3 text-[14px] font-medium">Design</p>
-      <div role="radiogroup" aria-label="Dock design" className="grid grid-cols-3 gap-3">
+      <div role="radiogroup" aria-label="Dock design" className="grid grid-cols-3 gap-3 lg:grid-cols-4">
         {DOCK_DESIGNS.map((d) => {
           const look = dockLook(d.id, { ...props.style, design: d.id }, props.accent, props.dark);
           const selected = d.id === props.value;
@@ -122,10 +145,17 @@ function DesignGrid(props: { value: DockDesign; style: DockStyle; accent: string
               <div className="relative flex h-16 items-end justify-center" style={{ background: "linear-gradient(135deg,#3b1d4a,#0f172a 60%,#1e3a5f)" }}>
                 <div
                   className={`flex items-center gap-1.5 ${look.full ? "w-full" : ""} ${look.align === "center" ? "justify-center" : "justify-start"}`}
-                  style={{ ...look.bar, borderRadius: look.full ? 0 : Math.min(look.radius, 12), padding: 5, marginBottom: look.full ? 0 : 6, backdropFilter: "blur(8px)" }}
+                  style={{
+                    ...(look.split ? {} : look.bar),
+                    borderRadius: look.full ? 0 : look.edge ? `${Math.min(look.radius, 12)}px ${Math.min(look.radius, 12)}px 0 0` : Math.min(look.radius, 12),
+                    padding: 5,
+                    marginBottom: look.full || look.edge ? 0 : 6,
+                    backdropFilter: "blur(8px)",
+                  }}
                 >
-                  {["#7c5cff", "#22d3ee", "#f472b6", "#f59e0b"].map((c) => (
-                    <span key={c} className="block h-5 w-5 rounded-[6px]" style={{ background: c, ...(look.item ? { boxShadow: "0 0 0 3px rgba(255,255,255,0.15)" } : {}) }} />
+                  {["#7c5cff", "#22d3ee", "#f472b6", "#f59e0b"].map((c, i) => (
+                    <span key={c} className="block h-5 w-5 rounded-[6px]"
+                      style={{ background: c, ...(look.split && i === 0 ? { ...look.bar, marginRight: 8 } : {}), ...(itemStyle(look, c) ? { boxShadow: "0 0 0 3px rgba(255,255,255,0.15)" } : {}) }} />
                   ))}
                 </div>
               </div>

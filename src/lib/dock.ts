@@ -28,6 +28,7 @@ export const activate = (key: string) => invoke("dock_activate", { key });
 export const launch = (path: string) => invoke("dock_launch", { path });
 export const closeApp = (key: string) => invoke("dock_close", { key });
 export const startMenu = () => invoke("dock_start_menu");
+export const shell = (which: "search" | "quick" | "calendar") => invoke("dock_shell", { which });
 export const setBar = (rect: Rect | null, radius: number) => invoke("dock_set_bar", { rect, radius });
 export const setHitRects = (rects: Rect[]) => invoke("overlay_set_hit_rects", { rects });
 export const installedApps = () => invoke<PinnedApp[]>("dock_installed_apps");

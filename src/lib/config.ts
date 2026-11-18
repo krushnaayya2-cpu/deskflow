@@ -20,7 +20,10 @@ export interface IslandConfig {
   visualizer: boolean;
 }
 
-export type DockDesign = "glass" | "minimal" | "neon" | "classic" | "pills" | "win11";
+export type DockDesign =
+  | "glass" | "minimal" | "neon" | "classic" | "pills" | "win11"
+  | "tab" | "pebble" | "rail" | "underline" | "split" | "stack" | "tiles";
+export type IconStyle = "original" | "mono" | "silhouette";
 export type DockPosition = "bottom" | "left" | "right";
 
 export interface DockStyle {
@@ -35,6 +38,8 @@ export interface DockStyle {
   magnification: number;
   position: DockPosition;
   autoHide: boolean;
+  iconStyle: IconStyle;
+  separators: boolean;
 }
 
 export interface PinnedApp {
@@ -56,6 +61,8 @@ export interface DockConfig {
   showRunning: boolean;
   showStart: boolean;
   showClock: boolean;
+  showTray: boolean;
+  showSearch: boolean;
   hideTaskbar: boolean;
   pinned: PinnedApp[];
   pinsImported: boolean;

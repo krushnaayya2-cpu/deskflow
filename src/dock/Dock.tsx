@@ -1,5 +1,5 @@
 // The dock: pinned + running apps with magnification, launch bounce,
-// right-click menus, drag-to-reorder and six designs.
+// right-click menus, drag-to-reorder, system tray and thirteen designs.
 //
 // The window is bigger than the bar (room for magnified icons, tooltips and
 // menus). Everything is positioned absolutely in window coordinates; the
@@ -19,14 +19,19 @@ import {
   revealPath,
   setBar,
   setHitRects,
+  shell,
   startMenu,
   type Rect,
   type RunningApp,
 } from "../lib/dock";
-import { dockLook } from "./designs";
+import { dockLook, itemStyle } from "./designs";
+import { getSnapshot, onState, type SystemState } from "../lib/island";
+import type { IconStyle } from "../lib/config";
 
 type Item =
   | { kind: "start"; id: string }
+  | { kind: "search"; id: string }
+  | { kind: "tray"; id: string }
   | { kind: "app"; id: string; name: string; path: string; key: string; pin?: PinnedApp; app?: RunningApp }
   | { kind: "sep"; id: string }
   | { kind: "clock"; id: string };
@@ -39,7 +44,10 @@ interface Placed {
 }
 
 const SEP_LEN = 10;
-const CLOCK_LEN = 76;
+const CLOCK_LEN = 96;
+const TRAY_ICONS_LEN = 86;
+/** Groups for split/full layouts: lead (Start, Search), apps, tail (tray). */
+const groupOf = (it: Item) => (it.kind === "start" || it.kind === "search" ? 0 : it.kind === "tray" || it.kind === "clock" ? 2 : 1);
 const BOUNCE_MS = 1700;
 
 const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -55,13 +63,15 @@ export default function Dock() {
   const [systemDark, setSystemDark] = useState(media.matches);
   const [, setTick] = useState(0);
   const [win, setWin] = useState({ w: window.innerWidth, h: window.innerHeight });
+  const [sys, setSys] = useState<SystemState>({ media: null, battery: null, network: null });
   const cfgRef = useRef<Config | null>(null);
 
   useEffect(() => {
     const show = (c: Config) => ((cfgRef.current = c), setLocal(c));
     getConfig().then(show);
     getRunning().then(setRunning).catch(() => {});
-    const subs = [onConfigChanged(show), onRunning(setRunning), onHover((h) => (setHovered(h), !h && setMouse(null)))];
+    getSnapshot().then(setSys).catch(() => {});
+    const subs = [onConfigChanged(show), onRunning(setRunning), onHover((h) => (setHovered(h), !h && setMouse(null))), onState(setSys)];
     const onMedia = () => setSystemDark(media.matches);
     media.addEventListener("change", onMedia);
     const onResize = () => setWin({ w: window.innerWidth, h: window.innerHeight });
@@ -86,6 +96,7 @@ export default function Dock() {
     const pinned = dragOrder ?? dock.pinned;
     const out: Item[] = [];
     if (dock.showStart) out.push({ kind: "start", id: "start" });
+    if (dock.showSearch) out.push({ kind: "search", id: "search" });
     const usedKeys = new Set<string>();
     for (const pin of pinned) {
       const app = pin.target ? running.find((r) => r.key === pin.target) : undefined;
@@ -97,12 +108,16 @@ export default function Dock() {
       if (extra.length && pinned.length) out.push({ kind: "sep", id: "sep" });
       for (const app of extra) out.push({ kind: "app", id: `run:${app.key}`, name: app.name, path: app.path, key: app.key, app });
     }
-    if (look.taskbarLike && dock.showClock && !vertical) out.push({ kind: "clock", id: "clock" });
+    // Tray (Wi-Fi/volume/battery + clock) on horizontal docks.
+    if (!vertical && (dock.showTray || dock.showClock)) {
+      if (!look.full && !look.stackTray && out.length) out.push({ kind: "sep", id: "sep-tray" });
+      out.push({ kind: "tray", id: "tray" });
+    }
     return out;
   }, [dock, look, running, dragOrder, vertical]);
 
   // Clock ticks only when visible.
-  const hasClock = items.some((i) => i.kind === "clock");
+  const hasClock = items.some((i) => i.kind === "clock" || i.kind === "tray");
   useEffect(() => {
     if (!hasClock) return;
     const iv = window.setInterval(() => setTick((t) => t + 1), 15_000);
@@ -124,8 +139,10 @@ export default function Dock() {
   const thickness = size + pad * 2 + (look?.indicator === "line" ? 4 : 6);
   const mainSpace = vertical ? win.h : win.w;
 
-  const { placed, barLen } = useMemo(() => {
-    const lenOf = (it: Item) => (it.kind === "sep" ? SEP_LEN : it.kind === "clock" ? CLOCK_LEN : size);
+  const trayLen = (dock?.showTray ? TRAY_ICONS_LEN : 0) + (dock?.showClock ? CLOCK_LEN : 0);
+  const { placed, barLen, groups } = useMemo(() => {
+    const lenOf = (it: Item) =>
+      it.kind === "sep" ? SEP_LEN : it.kind === "clock" ? CLOCK_LEN : it.kind === "tray" ? trayLen : it.kind === "search" && look?.split ? size * 2.4 : size;
     const seq = (list: Item[], start: number) => {
       const out: Placed[] = [];
       let cur = start;
@@ -136,22 +153,33 @@ export default function Dock() {
       }
       return { out, end: list.length ? cur - spacing : start };
     };
+    // Stack: the tray lives in its own capsule above the bar.
+    const main = look?.stackTray ? items.filter((i) => i.kind !== "tray") : items;
     if (look?.full) {
-      // Start at the left edge, clock at the right edge, apps centred or after Start.
-      const lead = items.filter((i) => i.kind === "start");
-      const tail = items.filter((i) => i.kind === "clock");
-      const mid = items.filter((i) => i.kind !== "start" && i.kind !== "clock");
+      // Start/Search at the left edge, tray at the right, apps centred or after Start.
+      const edge = look.split ? look.margin + pad : pad + 4;
+      const lead = main.filter((i) => groupOf(i) === 0);
+      const tail = main.filter((i) => groupOf(i) === 2);
+      const mid = main.filter((i) => groupOf(i) === 1);
       const L = mainSpace;
-      const a = seq(lead, pad + 4);
+      const a = seq(lead, edge);
       const midLen = seq(mid, 0).end;
-      const midStart = look.align === "center" ? Math.max(a.end + spacing, (L - midLen) / 2) : a.end + spacing;
-      const b = seq(mid, midStart);
-      const c = seq(tail, L - pad - 4 - (tail.length ? CLOCK_LEN : 0));
-      return { placed: [...a.out, ...b.out, ...c.out], barLen: L };
+      const gapAfterLead = look.split ? pad * 2 + 16 : spacing;
+      const midStart = look.align === "center" ? Math.max(a.end + gapAfterLead, (L - midLen) / 2) : a.end + gapAfterLead;
+      const b2 = seq(mid, midStart);
+      const tailLen = seq(tail, 0).end;
+      const c = seq(tail, L - edge - tailLen);
+      // Capsule extents per group (used by the Split design).
+      const g = [
+        lead.length ? { start: edge - pad, end: a.end + pad } : null,
+        mid.length ? { start: midStart - pad, end: b2.end + pad } : null,
+        tail.length ? { start: L - edge - tailLen - pad, end: L - edge + pad } : null,
+      ];
+      return { placed: [...a.out, ...b2.out, ...c.out], barLen: L, groups: g };
     }
-    const s = seq(items, pad);
-    return { placed: s.out, barLen: s.end + pad };
-  }, [items, look, size, spacing, pad, mainSpace]);
+    const sq = seq(main, pad);
+    return { placed: sq.out, barLen: sq.end + pad, groups: [] as ({ start: number; end: number } | null)[] };
+  }, [items, look, size, spacing, pad, mainSpace, trayLen]);
 
   const margin = look?.margin ?? 10;
   const autoHidden = !!style?.autoHide && !hovered && !menu;
@@ -162,6 +190,14 @@ export default function Dock() {
     const x = style?.position === "left" ? margin : win.w - margin - thickness;
     return { x, y: along, w: thickness, h: barLen };
   }, [look, mainSpace, barLen, vertical, win, margin, thickness, style?.position]);
+
+  // Stack: the tray capsule above the bar.
+  const stackRect: Rect | null = useMemo(() => {
+    if (!look?.stackTray || vertical || !items.some((i) => i.kind === "tray")) return null;
+    const w = trayLen + pad * 2 + 8;
+    const h = 34;
+    return { x: (win.w - w) / 2, y: bar.y - h - 8, w, h };
+  }, [look?.stackTray, vertical, items, trayLen, pad, win.w, bar.y]);
 
   // Slide off the screen edge when auto-hidden.
   const hideOffset = thickness + margin + 4;
@@ -176,7 +212,7 @@ export default function Dock() {
   const dragging = dragOrder !== null;
   // Which items magnify: on full-width designs only the app group (Start
   // and the clock stay put at the screen edges).
-  const magnifies = (it: Item) => it.kind === "app" || (it.kind === "start" && !look?.full);
+  const magnifies = (it: Item) => it.kind === "app" || (it.kind === "start" && !look?.full) || (it.kind === "search" && !look?.full && !look?.split);
   const scales = useMemo(() => {
     if (mouse === null || mag <= 1 || dragging || menu) return placed.map(() => 1);
     const range = size * 2.6;
@@ -196,7 +232,7 @@ export default function Dock() {
     let before = 0;
     // Everything in the app group moves (including the separator); on
     // full-width designs Start and the clock stay fixed.
-    const moves = (it: Item) => !(look?.full && (it.kind === "start" || it.kind === "clock"));
+    const moves = (it: Item) => !(look?.full && groupOf(it) !== 1);
     const sh = placed.map((p, i) => {
       if (!moves(p.item)) return 0;
       const v = before + e[i] / 2 - E / 2;
@@ -253,8 +289,9 @@ export default function Dock() {
       rects = [r];
     }
     if (menuRect) rects.push(menuRect);
+    if (stackRect && !autoHidden) rects.push(stackRect);
     setHitRects(rects).catch(() => {});
-  }, [look, autoHidden, bar, grownBar, win, vertical, hovered, size, mag, menuRect, style?.position]);
+  }, [look, autoHidden, bar, grownBar, win, vertical, hovered, size, mag, menuRect, stackRect, style?.position]);
 
   // Real blur behind the bar (backend decides if the design wants it).
   const radius = look?.radius ?? 0;
@@ -266,8 +303,9 @@ export default function Dock() {
   const reportBar = useCallback(() => {
     if (!look || autoHidden || style?.design === "pills") return;
     cancelAnimationFrame(raf.current);
-    raf.current = requestAnimationFrame(() => setBar(grownBar, radius).catch(() => {}));
-  }, [look, autoHidden, style?.design, grownBar, radius]);
+    const r = look.edge ? (vertical ? { ...grownBar, w: grownBar.w + radius } : { ...grownBar, h: grownBar.h + radius }) : grownBar;
+    raf.current = requestAnimationFrame(() => setBar(r, radius).catch(() => {}));
+  }, [look, autoHidden, style?.design, grownBar, radius, vertical]);
   useEffect(() => {
     if (!autoHidden) reportBar();
   }, [reportBar, autoHidden]);
@@ -282,6 +320,7 @@ export default function Dock() {
   const onItemClick = (it: Item) => {
     setMenu(null);
     if (it.kind === "start") return void startMenu();
+    if (it.kind === "search") return void shell("search");
     if (it.kind !== "app") return;
     if (it.app) return void activate(it.app.key).catch(() => {});
     setBouncing((b) => ({ ...b, [it.id]: Date.now() }));
@@ -343,15 +382,47 @@ export default function Dock() {
         }}
       >
         {/* Bar surface */}
-        {style.design !== "pills" && (
-          <m.div
-            className="absolute"
-            style={{ borderRadius: radius, ...look.bar }}
-            initial={false}
-            animate={{ left: grownBar.x, top: grownBar.y, width: grownBar.w, height: grownBar.h }}
-            transition={{ type: "spring", stiffness: 500, damping: 30 }}
-          />
+        {look.split
+          ? groups.map(
+              (g, gi) =>
+                g && (
+                  <m.div key={gi} className="absolute" style={{ ...look.bar, borderRadius: radius }} initial={false}
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                    animate={(() => {
+                      // The app capsule grows with magnification.
+                      const grow = gi === 1 ? extra / 2 : 0;
+                      return vertical
+                        ? { left: bar.x, top: bar.y + g.start - grow, width: bar.w, height: g.end - g.start + grow * 2 }
+                        : { left: bar.x + g.start - grow, top: bar.y, width: g.end - g.start + grow * 2, height: bar.h };
+                    })()} />
+                ),
+            )
+          : Object.keys(look.bar).length > 0 && (
+              <m.div
+                className="absolute"
+                style={{
+                  ...look.bar,
+                  borderRadius: look.edge
+                    ? style.position === "bottom" ? `${radius}px ${radius}px 0 0` : style.position === "left" ? `0 ${radius}px ${radius}px 0` : `${radius}px 0 0 ${radius}px`
+                    : radius,
+                }}
+                initial={false}
+                animate={{ left: grownBar.x, top: grownBar.y, width: grownBar.w, height: grownBar.h }}
+                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+              />
+            )}
+        {stackRect && (
+          <div className="absolute flex items-center justify-center" style={{ ...look.bar, borderRadius: 17, left: stackRect.x, top: stackRect.y, width: stackRect.w, height: stackRect.h }}>
+            <Tray sys={sys} showIcons={dock.showTray} showClock={dock.showClock} fg={look.fg} compact />
+          </div>
         )}
+        {(style.separators || look.dividers) && !vertical &&
+          placed.map((p, i) => {
+            const n = placed[i + 1];
+            if (!n || p.item.kind !== "app" || n.item.kind !== "app") return null;
+            const x = bar.x + p.pos + p.len + spacing / 2 + (shifts[i] + shifts[i + 1]) / 2;
+            return <div key={`div-${i}`} className="absolute opacity-25" style={{ left: x, top: bar.y + bar.h * 0.28, width: 1, height: bar.h * 0.44, background: look.fg }} />;
+          })}
 
         {placed.map((p, i) => {
           const it = p.item;
@@ -374,6 +445,13 @@ export default function Dock() {
           if (it.kind === "clock") {
             return <Clock key={it.id} style={{ ...pos, left: bar.x + p.pos, width: CLOCK_LEN }} />;
           }
+          if (it.kind === "tray") {
+            return (
+              <div key={it.id} className="absolute flex items-center justify-end" style={{ ...pos, left: bar.x + p.pos + shift, width: p.len }}>
+                <Tray sys={sys} showIcons={dock.showTray} showClock={dock.showClock} fg={look.fg} />
+              </div>
+            );
+          }
           const origin =
             style.position === "bottom" ? "50% 100%" : style.position === "left" ? "0% 50%" : "100% 50%";
           const bounce = it.kind === "app" && bouncing[it.id];
@@ -388,9 +466,10 @@ export default function Dock() {
             >
               <m.button
                 type="button"
-                aria-label={it.kind === "start" ? "Start" : it.name}
+                aria-label={it.kind === "start" ? "Start" : it.kind === "search" ? "Search" : it.name}
                 className="relative flex h-full w-full items-center justify-center outline-none"
-                style={{ transformOrigin: origin, ...(look.item ? { ...look.item, borderRadius: radius * 0.6 + 6 } : {}) }}
+                style={{ transformOrigin: origin, ...(itemStyle(look, it.id) && it.kind !== "search" ? { ...itemStyle(look, it.id), borderRadius: Math.min(radius * 0.6 + 6, size * 0.32) } : {}),
+                  ...(it.kind === "search" && look.split ? { background: "rgba(127,127,127,0.14)", borderRadius: 999 } : {}) }}
                 animate={{
                   scale: sc,
                   ...(bounce
@@ -414,15 +493,17 @@ export default function Dock() {
               >
                 {it.kind === "start" ? (
                   <StartGlyph size={size * 0.62} accent={accent} />
+                ) : it.kind === "search" ? (
+                  <SearchGlyph size={size * 0.5} fg={look.fg} label={look.split} />
                 ) : (
-                  <AppIcon path={it.path} hwnd={it.app?.windows[0]?.hwnd} name={it.name} size={size * (look.item ? 0.78 : 1)} accent={accent} />
+                  <AppIcon path={it.path} hwnd={it.app?.windows[0]?.hwnd} name={it.name} size={size * (look.item ? 0.7 : 1)} accent={accent} iconStyle={style.iconStyle} />
                 )}
               </m.button>
               {it.kind === "app" && it.app && (
-                <Indicator kind={look.indicator} focused={it.app.focused} accent={accent} fg={look.fg} pos={style.position} size={size} pad={pad} count={it.app.windows.length} />
+                <Indicator kind={look.indicator} focused={it.app.focused} accent={accent} fg={look.fg} pos={style.position} size={size} pad={pad} count={it.app.windows.length} wide={!!look.wideIndicator} />
               )}
               {hoveredIdx === i && (
-                <Tooltip text={it.kind === "start" ? "Start" : it.name} pos={style.position} size={size} scale={sc} dark={dark} />
+                <Tooltip text={it.kind === "start" ? "Start" : it.kind === "search" ? "Search" : it.name} pos={style.position} size={size} scale={sc} dark={dark} />
               )}
             </m.div>
           );
@@ -451,7 +532,7 @@ export default function Dock() {
 
 const iconCache = new Map<string, string | null>();
 
-function AppIcon({ path, hwnd, name, size, accent }: { path: string; hwnd?: number; name: string; size: number; accent: string }) {
+function AppIcon({ path, hwnd, name, size, accent, iconStyle }: { path: string; hwnd?: number; name: string; size: number; accent: string; iconStyle: IconStyle }) {
   const [src, setSrc] = useState<string | null | undefined>(iconCache.get(path));
   useEffect(() => {
     if (iconCache.has(path)) return setSrc(iconCache.get(path));
@@ -466,7 +547,20 @@ function AppIcon({ path, hwnd, name, size, accent }: { path: string; hwnd?: numb
       alive = false;
     };
   }, [path, hwnd]);
-  if (src) return <img src={src} alt="" draggable={false} style={{ width: size, height: size }} className="pointer-events-none select-none drop-shadow" />;
+  if (src && iconStyle === "silhouette") {
+    // Single-colour version: the icon's shape used as a mask over the accent.
+    return (
+      <div className="pointer-events-none" style={{ width: size * 0.82, height: size * 0.82, background: accent,
+        WebkitMaskImage: `url(${src})`, maskImage: `url(${src})`, WebkitMaskSize: "contain", maskSize: "contain",
+        WebkitMaskRepeat: "no-repeat", maskRepeat: "no-repeat", WebkitMaskPosition: "center", maskPosition: "center",
+        filter: `drop-shadow(0 0 6px ${accent}66)` }} />
+    );
+  }
+  if (src)
+    return (
+      <img src={src} alt="" draggable={false} style={{ width: size, height: size, filter: iconStyle === "mono" ? "grayscale(1) contrast(1.05) brightness(1.15)" : undefined }}
+        className="pointer-events-none select-none drop-shadow" />
+    );
   // Fallback: first letter on an accent tile.
   return (
     <div
@@ -490,9 +584,9 @@ function StartGlyph({ size, accent }: { size: number; accent: string }) {
   );
 }
 
-function Indicator(p: { kind: "dot" | "line" | "glow"; focused: boolean; accent: string; fg: string; pos: string; size: number; pad: number; count: number }) {
+function Indicator(p: { kind: "dot" | "line" | "glow"; focused: boolean; accent: string; fg: string; pos: string; size: number; pad: number; count: number; wide?: boolean }) {
   const color = p.focused || p.kind === "glow" ? p.accent : p.fg;
-  const len = p.kind === "line" ? (p.focused ? 18 : 8) : p.focused ? 14 : 5;
+  const len = p.wide ? (p.focused ? p.size * 0.9 : p.size * 0.5) : p.kind === "line" ? (p.focused ? 18 : 8) : p.focused ? 14 : 5;
   const thick = p.kind === "line" ? 3 : 5;
   const off = p.pad / 2 + 2;
   const style: CSSProperties =
@@ -523,6 +617,54 @@ function Tooltip({ text, pos, size, scale, dark }: { text: string; pos: string; 
       style={{ ...style, background: dark ? "rgba(30,30,38,0.92)" : "rgba(255,255,255,0.95)", color: dark ? "#fff" : "#111", border: "1px solid rgba(127,127,127,0.25)" }}
     >
       {text}
+    </div>
+  );
+}
+
+function SearchGlyph({ size, fg, label }: { size: number; fg: string; label?: boolean }) {
+  return (
+    <span className="flex items-center gap-2" style={{ color: fg }}>
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
+        <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+      </svg>
+      {label && <span className="text-[13px] opacity-80">Search</span>}
+    </span>
+  );
+}
+
+/** Wi-Fi, volume and battery icons plus the clock. Opens Quick Settings / calendar. */
+function Tray({ sys, showIcons, showClock, fg, compact }: { sys: SystemState; showIcons: boolean; showClock: boolean; fg: string; compact?: boolean }) {
+  const n = sys.network;
+  const b = sys.battery;
+  const icon = (d: React.ReactNode) => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>{d}</svg>
+  );
+  const d = new Date();
+  return (
+    <div className="flex items-center gap-1" style={{ color: fg }}>
+      {showIcons && (
+        <button type="button" aria-label="Quick settings" onClick={() => shell("quick")}
+          className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-[rgba(127,127,127,0.18)]">
+          {icon(n && !n.connected ? <path d="M2 2l20 20M8.5 16a5 5 0 0 1 7 0M5 12.5a10 10 0 0 1 5-2.8M2 9a15 15 0 0 1 4.2-2.8" /> : <><path d="M2 9a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0" /><circle cx="12" cy="19.5" r="1" fill="currentColor" /></>)}
+          {icon(<path d="M11 5 6 9H2v6h4l5 4zM15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14" />)}
+          {b && (
+            <span className="flex items-center" title={`${b.percent}%${b.charging ? " (charging)" : ""}`}>
+              <svg width="20" height="16" viewBox="0 0 26 14" fill="none" aria-hidden>
+                <rect x="1" y="1" width="21" height="12" rx="3" stroke="currentColor" strokeWidth="1.6" />
+                <rect x="3" y="3" width={Math.max(1, (17 * b.percent) / 100)} height="8" rx="1.5" fill={b.percent <= 20 && !b.charging ? "#ef4444" : "currentColor"} />
+                <path d="M24 5v4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+            </span>
+          )}
+        </button>
+      )}
+      {showClock && (
+        <button type="button" aria-label="Calendar and notifications" onClick={() => shell("calendar")}
+          className={`flex flex-col items-end whitespace-nowrap rounded-lg px-2 py-0.5 text-right leading-tight hover:bg-[rgba(127,127,127,0.18)] ${compact ? "flex-row gap-2" : ""}`}>
+          <span className="text-[12.5px] font-medium tabular-nums">{d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
+          {!compact && <span className="text-[11px] opacity-70">{d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}</span>}
+        </button>
+      )}
     </div>
   );
 }

@@ -177,7 +177,7 @@ fn walk_lnks(dir: &std::path::Path, depth: u32, out: &mut Vec<PinnedApp>) {
     }
 }
 
-pub use platform::{activate, close_all, init_thread, open_start_menu};
+pub use platform::{activate, close_all, init_thread, open_start_menu, shell_shortcut};
 
 #[cfg(windows)]
 mod platform {
@@ -450,6 +450,23 @@ mod platform {
         }
     }
 
+    /// Win + letter: "search" (S), "quick" settings (A), "calendar" /
+    /// notifications (N).
+    pub fn shell_shortcut(which: &str) {
+        let key = match which {
+            "search" => b'S',
+            "quick" => b'A',
+            "calendar" => b'N',
+            _ => return,
+        };
+        unsafe {
+            keybd_event(VK_LWIN.0 as u8, 0, KEYBD_EVENT_FLAGS(0), 0);
+            keybd_event(key, 0, KEYBD_EVENT_FLAGS(0), 0);
+            keybd_event(key, 0, KEYEVENTF_KEYUP, 0);
+            keybd_event(VK_LWIN.0 as u8, 0, KEYEVENTF_KEYUP, 0);
+        }
+    }
+
     /// Target exe and arguments of a .lnk shortcut.
     pub fn resolve_lnk(path: &str) -> Option<(String, String)> {
         unsafe {
@@ -485,6 +502,7 @@ mod platform {
         Err("Only supported on Windows".into())
     }
     pub fn open_start_menu() {}
+    pub fn shell_shortcut(_which: &str) {}
     pub fn resolve_lnk(_path: &str) -> Option<(String, String)> {
         None
     }

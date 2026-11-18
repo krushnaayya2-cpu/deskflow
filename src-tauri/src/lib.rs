@@ -56,6 +56,7 @@ pub fn run() {
             dock::dock_launch,
             dock::dock_close,
             dock::dock_start_menu,
+            dock::dock_shell,
             dock::dock_installed_apps,
             dock::dock_make_pin,
             dock::dock_export_theme,

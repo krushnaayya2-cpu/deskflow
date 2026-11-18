@@ -168,6 +168,32 @@ pub enum DockDesign {
     Pills,
     /// Full-width, centred icons, Windows 11 look.
     Win11,
+    /// Attached to the screen edge with rounded top corners.
+    Tab,
+    /// Dark pill; every icon sits on its own dark tile.
+    Pebble,
+    /// Squared frosted rail with dividers between icons.
+    Rail,
+    /// Transparent with a thin line and underline indicators.
+    Underline,
+    /// Three capsules: Start/Search, apps, system tray.
+    Split,
+    /// System tray capsule stacked above the app capsule.
+    Stack,
+    /// Icons on soft pastel tiles.
+    Tiles,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum IconStyle {
+    /// The app's own colourful icon.
+    #[default]
+    Original,
+    /// Greyscale.
+    Mono,
+    /// Single-colour silhouette in the accent colour.
+    Silhouette,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -210,6 +236,9 @@ pub struct DockStyle {
     pub magnification: u32,
     pub position: DockPosition,
     pub auto_hide: bool,
+    pub icon_style: IconStyle,
+    /// Thin dividers between icons.
+    pub separators: bool,
 }
 
 impl Default for DockStyle {
@@ -226,6 +255,8 @@ impl Default for DockStyle {
             magnification: 160,
             position: DockPosition::Bottom,
             auto_hide: false,
+            icon_style: IconStyle::Original,
+            separators: false,
         }
     }
 }
@@ -257,6 +288,9 @@ pub struct DockConfig {
     pub show_running: bool,
     pub show_start: bool,
     pub show_clock: bool,
+    /// Wi-Fi, volume and battery icons (with the clock).
+    pub show_tray: bool,
+    pub show_search: bool,
     /// Hide the Windows taskbar while DeskFlow runs (restored on quit).
     pub hide_taskbar: bool,
     pub pinned: Vec<PinnedApp>,
@@ -276,6 +310,8 @@ impl Default for DockConfig {
             show_running: true,
             show_start: true,
             show_clock: true,
+            show_tray: true,
+            show_search: false,
             hide_taskbar: false,
             pinned: Vec::new(),
             pins_imported: false,

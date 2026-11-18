@@ -28,13 +28,14 @@ Built with **Tauri 2** (Rust + React/TypeScript + Tailwind). No Electron, no tel
 
 A dock with your pinned and running apps that can replace the Windows taskbar.
 
-- Six designs: **Glass** (real Windows acrylic blur), **Minimal**, **Neon**, **Classic bar**, **Floating pills** and **Windows 11**.
+- Thirteen designs: **Glass** (real Windows acrylic blur), **Minimal**, **Neon**, **Classic bar**, **Floating pills**, **Windows 11**, **Edge tab**, **Pebble**, **Rail**, **Underlined**, **Split** (Start/Search · apps · tray capsules), **Stack** (tray above apps) and **Pastel tiles**.
+- System tray (Wi-Fi, volume, battery → Quick Settings; clock → calendar), Search button, icon styles (original, mono, accent silhouette), dividers between icons.
 - Pinned apps are imported from your taskbar on first run. Running apps show an indicator (focused app highlighted).
 - Click to open/focus (click again to minimise, or cycle windows), middle-click for a new window, right-click for Show / New window / Pin / Show in folder / Close. Drag icons to reorder pinned apps.
 - macOS-style magnification and a launch bounce.
 - Settings → *Dock*: icon size, spacing, corner radius, blur strength, opacity, accent, magnification, glass/solid/transparent background, bottom/left/right, auto-hide, main or all displays, Start button, clock, running apps, add apps from the Start menu.
 - **Hide the Windows taskbar** (optional). DeskFlow restores it, with its original auto-hide setting, when you turn the option off or quit.
-- Themes: six presets, save your own, and export/import themes as `.json` files.
+- Themes: presets for every design plus Onyx, Silver, Indigo outline, Night shelf, Dusk pebble and Sage capsules, save your own, and export/import themes as `.json` files.
 
 ## Dynamic Island
 
