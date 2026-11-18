@@ -6,8 +6,10 @@
 
 mod commands;
 mod config;
+mod dock;
 mod hotkey;
 mod island;
+mod overlay;
 mod tray;
 mod windows;
 
@@ -30,18 +32,30 @@ pub fn run() {
         ))
         .plugin(hotkey::plugin())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             commands::get_config,
             commands::set_config,
             commands::get_app_info,
             commands::open_config_folder,
-            island::island_set_hit_rect,
+            overlay::overlay_set_hit_rects,
             island::island_snapshot,
             island::island_demo,
             island::media_control,
             island::open_path,
             island::reveal_path,
             island::open_settings,
+            dock::dock_set_bar,
+            dock::dock_running,
+            dock::dock_icon,
+            dock::dock_activate,
+            dock::dock_launch,
+            dock::dock_close,
+            dock::dock_start_menu,
+            dock::dock_installed_apps,
+            dock::dock_make_pin,
+            dock::dock_export_theme,
+            dock::dock_import_theme,
         ])
         .setup(|app| {
             let handle = app.handle();
@@ -59,7 +73,9 @@ pub fn run() {
             }
             tray::create(handle, &cfg)?;
             windows::apply_theme(handle, cfg.appearance.theme);
+            overlay::init(handle);
             island::init(handle, &cfg);
+            dock::init(handle, &cfg);
 
             // Show settings on the very first manual launch so the user sees
             // something; otherwise DeskFlow starts silently in the tray.
@@ -81,12 +97,11 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("failed to start DeskFlow");
 
-    app.run(|_app, event| {
+    app.run(|app, event| match event {
         // Only an explicit Quit (which passes an exit code) ends the process.
-        if let RunEvent::ExitRequested { api, code, .. } = event {
-            if code.is_none() {
-                api.prevent_exit();
-            }
-        }
+        RunEvent::ExitRequested { api, code, .. } if code.is_none() => api.prevent_exit(),
+        // Never leave the Windows taskbar hidden after DeskFlow exits.
+        RunEvent::Exit => dock::restore_taskbar(app),
+        _ => {}
     });
 }

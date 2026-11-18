@@ -143,6 +143,170 @@ impl Default for IslandConfig {
     }
 }
 
+
+// ---- Dock ------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum DockDesign {
+    /// Floating frosted bar (real acrylic blur).
+    #[default]
+    Glass,
+    /// Flat, quiet, no border.
+    Minimal,
+    /// Dark bar with a glowing accent outline.
+    Neon,
+    /// Full-width bar like the classic taskbar.
+    Classic,
+    /// Each icon sits in its own floating pill.
+    Pills,
+    /// Full-width, centred icons, Windows 11 look.
+    Win11,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum DockBackground {
+    #[default]
+    Glass,
+    Solid,
+    Transparent,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum DockPosition {
+    #[default]
+    Bottom,
+    Left,
+    Right,
+}
+
+/// Everything about how the dock looks. Saved/loaded as a theme.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct DockStyle {
+    pub design: DockDesign,
+    pub background: DockBackground,
+    /// Icon size in pixels (24-128).
+    pub icon_size: u32,
+    /// Gap between icons in pixels (0-40).
+    pub spacing: u32,
+    /// Corner radius of the bar in pixels (0-48).
+    pub corner_radius: u32,
+    /// 0 = no blur, 100 = strongest glass effect.
+    pub blur: u32,
+    /// Background opacity, 0-100.
+    pub opacity: u32,
+    /// Accent colour for this dock; None follows the app accent.
+    pub accent: Option<String>,
+    /// Hover magnification in percent (100 = off, up to 250).
+    pub magnification: u32,
+    pub position: DockPosition,
+    pub auto_hide: bool,
+}
+
+impl Default for DockStyle {
+    fn default() -> Self {
+        Self {
+            design: DockDesign::Glass,
+            background: DockBackground::Glass,
+            icon_size: 48,
+            spacing: 8,
+            corner_radius: 22,
+            blur: 70,
+            opacity: 60,
+            accent: None,
+            magnification: 160,
+            position: DockPosition::Bottom,
+            auto_hide: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(default, rename_all = "camelCase")]
+pub struct PinnedApp {
+    pub name: String,
+    /// What to launch: an .exe or a .lnk shortcut.
+    pub path: String,
+    /// The .exe it runs (lower-case), used to match running windows.
+    pub target: String,
+    pub args: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(default, rename_all = "camelCase")]
+pub struct DockTheme {
+    pub name: String,
+    pub style: DockStyle,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct DockConfig {
+    pub enabled: bool,
+    pub monitor: IslandMonitor,
+    pub style: DockStyle,
+    pub show_running: bool,
+    pub show_start: bool,
+    pub show_clock: bool,
+    /// Hide the Windows taskbar while DeskFlow runs (restored on quit).
+    pub hide_taskbar: bool,
+    pub pinned: Vec<PinnedApp>,
+    /// Set once the user's taskbar pins have been imported.
+    pub pins_imported: bool,
+    pub themes: Vec<DockTheme>,
+    /// The taskbar's own auto-hide setting before DeskFlow changed it.
+    pub original_taskbar_autohide: Option<bool>,
+}
+
+impl Default for DockConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            monitor: IslandMonitor::Primary,
+            style: DockStyle::default(),
+            show_running: true,
+            show_start: true,
+            show_clock: true,
+            hide_taskbar: false,
+            pinned: Vec::new(),
+            pins_imported: false,
+            themes: Vec::new(),
+            original_taskbar_autohide: None,
+        }
+    }
+}
+
+impl DockStyle {
+    pub fn validate(&self) -> Result<(), String> {
+        let in_range = |v: u32, lo: u32, hi: u32, what: &str| {
+            if v < lo || v > hi {
+                Err(format!("{what} must be between {lo} and {hi}"))
+            } else {
+                Ok(())
+            }
+        };
+        in_range(self.icon_size, 24, 128, "Icon size")?;
+        in_range(self.spacing, 0, 40, "Spacing")?;
+        in_range(self.corner_radius, 0, 48, "Corner radius")?;
+        in_range(self.blur, 0, 100, "Blur")?;
+        in_range(self.opacity, 0, 100, "Opacity")?;
+        in_range(self.magnification, 100, 250, "Magnification")?;
+        if let Some(a) = &self.accent {
+            if !is_hex_color(a) {
+                return Err(format!("Dock accent must look like #7c5cff, got {a:?}"));
+            }
+        }
+        Ok(())
+    }
+}
+
+pub fn is_hex_color(a: &str) -> bool {
+    a.len() == 7 && a.starts_with('#') && a[1..].chars().all(|c| c.is_ascii_hexdigit())
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Config {
@@ -150,6 +314,7 @@ pub struct Config {
     pub general: GeneralConfig,
     pub appearance: AppearanceConfig,
     pub island: IslandConfig,
+    pub dock: DockConfig,
 }
 
 impl Default for Config {
@@ -159,6 +324,7 @@ impl Default for Config {
             general: GeneralConfig::default(),
             appearance: AppearanceConfig::default(),
             island: IslandConfig::default(),
+            dock: DockConfig::default(),
         }
     }
 }
@@ -167,11 +333,12 @@ impl Config {
     /// Reject values that would break the app before they are saved.
     pub fn validate(&self) -> Result<(), String> {
         let a = &self.appearance.accent;
-        let is_hex = a.len() == 7
-            && a.starts_with('#')
-            && a[1..].chars().all(|c| c.is_ascii_hexdigit());
-        if !is_hex {
+        if !is_hex_color(a) {
             return Err(format!("Accent colour must look like #7c5cff, got {a:?}"));
+        }
+        self.dock.style.validate()?;
+        for t in &self.dock.themes {
+            t.style.validate()?;
         }
         if self.island.offset_y > 200 {
             return Err("Island offset must be 200 px or less".into());
@@ -275,6 +442,28 @@ mod tests {
         assert_eq!(c.appearance.theme, ThemeMode::Dark);
         assert_eq!(c.appearance.accent, "#7c5cff");
         assert_eq!(c.general.settings_hotkey, "Ctrl+Alt+D");
+    }
+
+    #[test]
+    fn dock_style_validation() {
+        let mut s = DockStyle::default();
+        assert!(s.validate().is_ok());
+        s.icon_size = 300;
+        assert!(s.validate().is_err());
+        s.icon_size = 48;
+        s.accent = Some("red".into());
+        assert!(s.validate().is_err());
+        s.accent = Some("#ff0000".into());
+        assert!(s.validate().is_ok());
+    }
+
+    #[test]
+    fn theme_json_round_trips() {
+        let t = DockTheme { name: "Mine".into(), style: DockStyle { design: DockDesign::Neon, ..Default::default() } };
+        let json = serde_json::to_string(&t).unwrap();
+        assert!(json.contains("\"design\":\"neon\""));
+        let back: DockTheme = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, t);
     }
 
     #[test]

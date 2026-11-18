@@ -14,7 +14,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri = { version = "2", features = ["tray-icon", "image-png", "unstable"] }
 tauri-plugin-autostart = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-single-instance = "2"
@@ -23,6 +23,9 @@ serde_json = "1"
 log = "0.4"
 tauri-plugin-opener = "2"
 notify = "8"
+png = "0.18"
+base64 = "0.22"
+tauri-plugin-dialog = "2"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62", features = [
@@ -30,8 +33,15 @@ windows = { version = "0.62", features = [
   "Media_Control",
   "Networking_Connectivity",
   "Win32_Foundation",
+  "Win32_Graphics_Dwm",
+  "Win32_Graphics_Gdi",
+  "Win32_Storage_FileSystem",
   "Win32_System_Com",
   "Win32_System_Power",
+  "Win32_System_Threading",
+  "Win32_UI_Controls",
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_Shell",
   "Win32_UI_WindowsAndMessaging",
 ] }
 

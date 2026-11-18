@@ -3,7 +3,7 @@
 
 use crate::{
     config::{Config, ConfigStore},
-    hotkey, island, tray, windows,
+    dock, hotkey, island, tray, windows,
 };
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -30,9 +30,11 @@ pub fn apply_autostart(app: &AppHandle, enabled: bool) -> Result<(), String> {
 /// Validate, apply side effects (hotkey, autostart, theme), save, and notify
 /// all windows. Side effects run before saving so a failure (e.g. hotkey
 /// taken by another app) leaves the saved config unchanged.
-pub fn update_config(app: &AppHandle, new: Config) -> Result<Config, String> {
+pub fn update_config(app: &AppHandle, mut new: Config) -> Result<Config, String> {
     new.validate()?;
     let old = current_config(app);
+    // Backend-owned: the UI must never overwrite the remembered taskbar state.
+    new.dock.original_taskbar_autohide = old.dock.original_taskbar_autohide;
 
     if new.general.settings_hotkey != old.general.settings_hotkey {
         hotkey::register(app, &new.general.settings_hotkey)?;
@@ -49,8 +51,12 @@ pub fn update_config(app: &AppHandle, new: Config) -> Result<Config, String> {
     if new.island != old.island {
         island::sync(app, &new);
     }
-    let _ = app.emit(CONFIG_CHANGED, &new);
-    Ok(new)
+    if new.dock != old.dock || new.appearance != old.appearance {
+        dock::sync(app, &new);
+    }
+    let saved = current_config(app);
+    let _ = app.emit(CONFIG_CHANGED, &saved);
+    Ok(saved)
 }
 
 #[tauri::command]

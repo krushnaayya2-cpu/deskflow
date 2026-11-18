@@ -32,13 +32,13 @@ export type IslandEvent =
 
 export const getSnapshot = () => invoke<SystemState>("island_snapshot");
 export const setHitRect = (rect: { x: number; y: number; w: number; h: number }) =>
-  invoke("island_set_hit_rect", { rect });
+  invoke("overlay_set_hit_rects", { rects: [rect] });
 export const mediaControl = (action: "toggle" | "next" | "prev") => invoke("media_control", { action });
 export const openPath = (path: string) => invoke("open_path", { path });
 export const revealPath = (path: string) => invoke("reveal_path", { path });
 export const openSettings = () => invoke("open_settings");
 export const islandDemo = (step: number) => invoke("island_demo", { step });
 
-export const onHover = (cb: (inside: boolean) => void) => listen<boolean>("island://hover", (e) => cb(e.payload));
+export const onHover = (cb: (inside: boolean) => void) => listen<boolean>("overlay://hover", (e) => cb(e.payload));
 export const onState = (cb: (s: SystemState) => void) => listen<SystemState>("island://state", (e) => cb(e.payload));
 export const onEvent = (cb: (e: IslandEvent) => void) => listen<IslandEvent>("island://event", (e) => cb(e.payload));

@@ -4,7 +4,7 @@ name: Windows build
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'wip/**']
   pull_request:
   workflow_dispatch:
 
@@ -58,7 +58,7 @@ jobs:
       # Publish the latest main build as a public "dev" release so the
       # installer can be downloaded without signing in to GitHub.
       - name: Publish dev release
-        if: github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/main'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
