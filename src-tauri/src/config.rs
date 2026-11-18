@@ -59,12 +59,87 @@ impl Default for AppearanceConfig {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum IslandMonitor {
+    /// Only the main display.
+    #[default]
+    Primary,
+    /// One island on every connected display.
+    All,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum IslandSize {
+    Small,
+    #[default]
+    Medium,
+    Large,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum IslandStyle {
+    /// Translucent tinted glass with a light border.
+    #[default]
+    Glass,
+    /// Opaque black, like a phone's island.
+    Solid,
+}
+
+/// Which live activities the island shows.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct IslandActivities {
+    pub music: bool,
+    pub timer: bool,
+    pub battery: bool,
+    pub network: bool,
+    pub downloads: bool,
+}
+
+impl Default for IslandActivities {
+    fn default() -> Self {
+        Self { music: true, timer: true, battery: true, network: true, downloads: true }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct IslandConfig {
+    pub enabled: bool,
+    pub monitor: IslandMonitor,
+    pub size: IslandSize,
+    pub style: IslandStyle,
+    /// Gap between the top of the screen and the island, in pixels.
+    pub offset_y: u32,
+    /// Fade the island out when nothing is happening (hover to reveal).
+    pub hide_when_idle: bool,
+    pub activities: IslandActivities,
+}
+
+impl Default for IslandConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            monitor: IslandMonitor::Primary,
+            size: IslandSize::Medium,
+            style: IslandStyle::Glass,
+            offset_y: 8,
+            hide_when_idle: false,
+            activities: IslandActivities::default(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Config {
     pub version: u32,
     pub general: GeneralConfig,
     pub appearance: AppearanceConfig,
+    pub island: IslandConfig,
 }
 
 impl Default for Config {
@@ -73,6 +148,7 @@ impl Default for Config {
             version: CONFIG_VERSION,
             general: GeneralConfig::default(),
             appearance: AppearanceConfig::default(),
+            island: IslandConfig::default(),
         }
     }
 }
@@ -86,6 +162,9 @@ impl Config {
             && a[1..].chars().all(|c| c.is_ascii_hexdigit());
         if !is_hex {
             return Err(format!("Accent colour must look like #7c5cff, got {a:?}"));
+        }
+        if self.island.offset_y > 200 {
+            return Err("Island offset must be 200 px or less".into());
         }
         if self.general.settings_hotkey.trim().is_empty() {
             return Err("The settings hotkey cannot be empty".into());

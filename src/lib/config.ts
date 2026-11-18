@@ -4,6 +4,18 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 export type ThemeMode = "system" | "dark" | "light";
 
+export type IslandActivity = "music" | "timer" | "battery" | "network" | "downloads";
+
+export interface IslandConfig {
+  enabled: boolean;
+  monitor: "primary" | "all";
+  size: "small" | "medium" | "large";
+  style: "glass" | "solid";
+  offsetY: number;
+  hideWhenIdle: boolean;
+  activities: Record<IslandActivity, boolean>;
+}
+
 export interface Config {
   version: number;
   general: {
@@ -14,6 +26,7 @@ export interface Config {
     theme: ThemeMode;
     accent: string;
   };
+  island: IslandConfig;
 }
 
 export interface AppInfo {

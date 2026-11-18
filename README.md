@@ -9,8 +9,8 @@ Built with **Tauri 2** (Rust + React/TypeScript + Tailwind). No Electron, no tel
 | Step | Feature | State |
 |---|---|---|
 | 1 | Project setup, tray app, settings, autostart, global hotkey | ✅ Done |
+| 3 | Dynamic Island (built early, on request) | ✅ Done |
 | 2 | Glass dock and theme system | Next |
-| 3 | Dynamic Island | Planned |
 | 4 | Hover-to-convert circle menu and conversion engine | Planned |
 | 5 | Desktop organizer | Planned |
 | 6 | AI spotlight and notifications | Planned |
@@ -23,6 +23,15 @@ Built with **Tauri 2** (Rust + React/TypeScript + Tailwind). No Electron, no tel
 - **Start with Windows** is on by default. When launched at sign-in, DeskFlow starts silently in the tray.
 - Closing the settings window keeps DeskFlow running. Use *Quit DeskFlow* in the tray menu to exit.
 - Launching DeskFlow a second time just brings up the settings window of the running copy.
+
+## Dynamic Island
+
+A pill at the top-centre of the screen (click-through when you're not touching it).
+
+- **Hover** to expand, **click** for details, **press and hold** for quick actions (1/5/15/25-minute timers, play/pause, settings).
+- Live activities: music from any media app (with previous/play-pause/next), timers, charger plugged in/out and low battery, Wi-Fi/network changes, and finished downloads (with Open and Show in folder).
+- Settings → *Dynamic Island*: on/off, size, glass or solid, main display or all displays, distance from top, hide when idle, which activities to show, and a **Show sample** preview button.
+- Bluetooth changes, file-conversion progress and AI notifications are added with later steps.
 
 ## Settings file
 

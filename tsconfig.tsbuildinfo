@@ -1,1 +1,1 @@
-{"root":["./src/lib/config.ts","./src/lib/hotkey.ts","./src/lib/theme.ts","./src/settings/App.tsx","./src/settings/controls.tsx","./src/settings/main.tsx","./src/settings/sections.tsx"],"version":"5.9.3"}
+{"root":["./src/island/Island.tsx","./src/island/icons.tsx","./src/island/main.tsx","./src/lib/config.ts","./src/lib/hotkey.ts","./src/lib/island.ts","./src/lib/theme.ts","./src/settings/App.tsx","./src/settings/controls.tsx","./src/settings/main.tsx","./src/settings/sections.tsx"],"version":"5.9.3"}

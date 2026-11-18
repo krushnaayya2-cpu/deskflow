@@ -1,12 +1,13 @@
 //! DeskFlow backend entry point.
 //!
-//! Step 1 wires up the always-running tray app: JSON config, start with
-//! Windows, a global hotkey for settings, and the settings window. Later steps
-//! add modules (dock, island, converter, organizer, ai) next to these.
+//! Wires up the always-running tray app (JSON config, start with Windows,
+//! global settings hotkey, settings window) and the Dynamic Island. Later
+//! steps add modules (dock, converter, organizer, ai) next to these.
 
 mod commands;
 mod config;
 mod hotkey;
+mod island;
 mod tray;
 mod windows;
 
@@ -28,11 +29,19 @@ pub fn run() {
             Some(vec![AUTOSTART_FLAG]),
         ))
         .plugin(hotkey::plugin())
+        .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             commands::get_config,
             commands::set_config,
             commands::get_app_info,
             commands::open_config_folder,
+            island::island_set_hit_rect,
+            island::island_snapshot,
+            island::island_demo,
+            island::media_control,
+            island::open_path,
+            island::reveal_path,
+            island::open_settings,
         ])
         .setup(|app| {
             let handle = app.handle();
@@ -50,6 +59,7 @@ pub fn run() {
             }
             tray::create(handle, &cfg)?;
             windows::apply_theme(handle, cfg.appearance.theme);
+            island::init(handle, &cfg);
 
             // Show settings on the very first manual launch so the user sees
             // something; otherwise DeskFlow starts silently in the tray.

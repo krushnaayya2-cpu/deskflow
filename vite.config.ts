@@ -17,7 +17,8 @@ export default defineConfig({
     outDir: "dist",
     rollupOptions: {
       input: {
-        settings: resolve(root,"settings.html"),
+        settings: resolve(root, "settings.html"),
+        island: resolve(root, "island.html"),
       },
     },
   },

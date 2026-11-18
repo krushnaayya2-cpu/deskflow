@@ -3,7 +3,7 @@
 
 use crate::{
     config::{Config, ConfigStore},
-    hotkey, tray, windows,
+    hotkey, island, tray, windows,
 };
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -46,6 +46,9 @@ pub fn update_config(app: &AppHandle, new: Config) -> Result<Config, String> {
     }
 
     app.state::<ConfigStore>().set(new.clone())?;
+    if new.island != old.island {
+        island::sync(app, &new);
+    }
     let _ = app.emit(CONFIG_CHANGED, &new);
     Ok(new)
 }
