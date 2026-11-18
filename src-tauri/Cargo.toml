@@ -1,6 +1,6 @@
 [package]
 name = "deskflow"
-version = "0.3.0"
+version = "0.4.0"
 description = "DeskFlow - desktop organizer, glass dock, Dynamic Island and file converter for Windows 11"
 edition = "2021"
 rust-version = "1.80"
@@ -30,7 +30,11 @@ tauri-plugin-dialog = "2"
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62", features = [
   "Foundation",
+  "Media",
   "Media_Control",
+  "Storage_Streams",
+  "Win32_Media_Audio",
+  "Win32_Media_Audio_Endpoints",
   "Networking_Connectivity",
   "Win32_Foundation",
   "Win32_Graphics_Dwm",

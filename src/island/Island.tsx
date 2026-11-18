@@ -16,6 +16,7 @@ import { AnimatePresence, LazyMotion, domAnimation, m } from "framer-motion";
 import { getConfig, onConfigChanged, type Config } from "../lib/config";
 import {
   getSnapshot,
+  mediaArt,
   mediaControl,
   onEvent,
   onHover,
@@ -30,6 +31,8 @@ import {
 } from "../lib/island";
 import * as I from "./icons";
 import { DESIGNS, designVars } from "./designs";
+import { autoTheme, findTheme, shellStyle } from "./music/themes";
+import { BarMusic, CompactMusic, Decoration, FullMusic, OrbitRing } from "./music/MusicViews";
 
 const SCALE = { small: 0.85, medium: 1, large: 1.15 } as const;
 const SHAPES = {
@@ -40,6 +43,12 @@ const SHAPES = {
   actions: { w: 430, h: 100, r: 30 },
 } as const;
 type Mode = keyof typeof SHAPES;
+/** Larger shapes for the themed music player. */
+const MUSIC_SHAPES: Partial<Record<Mode, { w: number; h: number; r: number }>> = {
+  compact: { w: 300, h: 42, r: 21 },
+  medium: { w: 540, h: 96, r: 40 },
+  details: { w: 640, h: 196, r: 38 },
+};
 
 const TRANSIENT_MS = 4500;
 const LONG_PRESS_MS = 500;
@@ -116,6 +125,16 @@ export default function Island() {
     return () => window.clearInterval(iv);
   }, [timer, musicLingering]);
 
+  // Album art for the current track.
+  const [art, setArt] = useState<string | null>(null);
+  const artKey = media?.artKey ?? "";
+  useEffect(() => {
+    setArt(null);
+    if (!artKey) return;
+    // The backend fetches art right before announcing a new track.
+    mediaArt().then(setArt).catch(() => {});
+  }, [artKey]);
+
   // Timer finished?
   useEffect(() => {
     if (timer && now >= timer.endsAt) {
@@ -124,6 +143,13 @@ export default function Island() {
       chime();
     }
   }, [now, timer, pushTransient]);
+
+  // Progress bar ticks while the full player is open.
+  useEffect(() => {
+    if (!(pinned === "details" && sys.media?.playing)) return;
+    const iv = window.setInterval(() => setNow(Date.now()), 500);
+    return () => window.clearInterval(iv);
+  }, [pinned, sys.media?.playing]);
 
   // Leaving the island closes details/actions after a short grace period.
   useEffect(() => {
@@ -156,7 +182,8 @@ export default function Island() {
   const design = config ? DESIGNS[config.island.style] ?? DESIGNS.glass : DESIGNS.glass;
   const baseLook = design.look("#000");
   const offsetY = baseLook.notch ? 0 : config?.island.offsetY ?? 8;
-  const shape = SHAPES[mode];
+  const isMusic = current.kind === "music" && mode !== "actions" && mode !== "idle";
+  const shape = (isMusic && MUSIC_SHAPES[mode]) || SHAPES[mode];
   const w = shape.w * s;
   const h = shape.h * s * (mode === "idle" || mode === "compact" ? baseLook.heightScale ?? 1 : 1);
   useEffect(() => {
@@ -188,15 +215,22 @@ export default function Island() {
   const look = (DESIGNS[config.island.style] ?? DESIGNS.glass).look(config.appearance.accent);
   const hidden = mode === "idle" && config.island.hideWhenIdle && !hovered;
   const glowing = current.kind === "transient";
+  const themeChoice = findTheme(config.island.musicTheme);
+  const mTheme = themeChoice ?? autoTheme(config.appearance.accent, look.fg, look.muted);
+  const themed = isMusic && !!themeChoice;
+  const surface = themed ? shellStyle(mTheme) : { ...look.surface, ...designVars(look) };
+  const shadow = themed ? mTheme.glow : glowing ? look.glow(config.appearance.accent) : look.shadow;
 
   return (
     <LazyMotion features={domAnimation} strict>
       <div className="pointer-events-none fixed inset-0 flex justify-center" style={{ paddingTop: offsetY }}>
+        <div className="relative h-fit">
+        {themed && mTheme.deco === "orbit" && mode !== "compact" && <OrbitRing theme={mTheme} w={w} h={h} />}
         <m.div
           role="status"
           aria-live="polite"
-          className={`pointer-events-auto relative cursor-default overflow-hidden select-none ${look.className ?? ""}`}
-          style={{ ...look.surface, ...designVars(look), fontSize: 13 * s }}
+          className={`pointer-events-auto relative cursor-default overflow-hidden select-none ${themed ? "" : look.className ?? ""}`}
+          style={{ ...surface, fontSize: 13 * s }}
           initial={false}
           animate={{
             width: w,
@@ -206,18 +240,19 @@ export default function Island() {
             borderBottomLeftRadius: shape.r * s,
             borderBottomRightRadius: shape.r * s,
             opacity: hidden ? 0 : 1,
-            boxShadow: glowing ? look.glow(config.appearance.accent) : look.shadow,
+            boxShadow: shadow,
           }}
           transition={SPRING}
           onPointerDown={onPointerDown}
           onPointerUp={onPointerUp}
           onPointerLeave={() => window.clearTimeout(pressTimer.current)}
         >
+          {themed && mode !== "compact" && <Decoration theme={mTheme} s={s} />}
           <AnimatePresence mode="popLayout" initial={false}>
             <m.div
               key={`${mode}:${current.kind}:${current.kind === "transient" ? current.t.id : ""}`}
               className="absolute inset-0 flex items-center"
-              style={{ padding: `0 ${14 * s}px` }}
+              style={{ padding: `0 ${(isMusic ? 16 : 14) * s}px` }}
               initial={{ opacity: 0, scale: 0.92, filter: "blur(6px)" }}
               animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
               exit={{ opacity: 0, scale: 0.96, filter: "blur(6px)", transition: { duration: 0.12 } }}
@@ -225,6 +260,14 @@ export default function Island() {
             >
               {mode === "actions" ? (
                 <QuickActions s={s} accent={config.appearance.accent} media={media} onTimer={startTimer} />
+              ) : isMusic && current.kind === "music" ? (
+                mode === "compact" ? (
+                  <CompactMusic media={current.media} theme={mTheme} art={art} s={s} now={now} viz={config.island.visualizer} />
+                ) : mode === "medium" ? (
+                  <BarMusic media={current.media} theme={mTheme} art={art} s={s} now={now} viz={config.island.visualizer} />
+                ) : (
+                  <FullMusic media={current.media} theme={mTheme} art={art} s={s} now={now} viz={config.island.visualizer} />
+                )
               ) : (
                 <Content mode={mode} cur={current} sys={sys} s={s} now={now} accent={config.appearance.accent}
                   onCancelTimer={() => setTimer(null)}
@@ -234,6 +277,7 @@ export default function Island() {
             </m.div>
           </AnimatePresence>
         </m.div>
+        </div>
       </div>
     </LazyMotion>
   );

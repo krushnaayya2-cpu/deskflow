@@ -43,6 +43,7 @@ A pill at the top-centre of the screen (click-through when you're not touching i
 - **Hover** to expand, **click** for details, **press and hold** for quick actions (1/5/15/25-minute timers, play/pause, settings).
 - Live activities: music from any media app (with previous/play-pause/next), timers, charger plugged in/out and low battery, Wi-Fi/network changes, and finished downloads (with Open and Show in folder).
 - Settings → *Dynamic Island*: on/off, size, glass or solid, main display or all displays, distance from top, hide when idle, which activities to show, and a **Show sample** preview button.
+- **Music player styles** (Settings → Dynamic Island): 16 themes — Spectrum, Cosmic Dust, Pixel Pulse, Aurora Flow, Liquid Chrome, Neon Orbit, Emerald Rain, Mono Wave, Holographic, Ice Glass, Solar Flare, Abyss Blue, Blood Moon, Dark Plasma, Phantom Green, Void Pulse — or match the island design. Each has a compact pill, a hover player bar and a full player (click) with album art, an audio-reactive visualizer, progress/seek, shuffle, repeat and system volume.
 - Bluetooth changes, file-conversion progress and AI notifications are added with later steps.
 
 ## Settings file

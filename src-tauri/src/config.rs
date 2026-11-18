@@ -127,6 +127,10 @@ pub struct IslandConfig {
     /// Fade the island out when nothing is happening (hover to reveal).
     pub hide_when_idle: bool,
     pub activities: IslandActivities,
+    /// Music player look: "auto" (match the island design) or a theme id.
+    pub music_theme: String,
+    /// Show the audio-reactive visualizer while music plays.
+    pub visualizer: bool,
 }
 
 impl Default for IslandConfig {
@@ -139,6 +143,8 @@ impl Default for IslandConfig {
             offset_y: 8,
             hide_when_idle: false,
             activities: IslandActivities::default(),
+            music_theme: "auto".into(),
+            visualizer: true,
         }
     }
 }
@@ -339,6 +345,9 @@ impl Config {
         self.dock.style.validate()?;
         for t in &self.dock.themes {
             t.style.validate()?;
+        }
+        if self.island.music_theme.len() > 40 {
+            return Err("Unknown music theme".into());
         }
         if self.island.offset_y > 200 {
             return Err("Island offset must be 200 px or less".into());

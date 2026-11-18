@@ -16,6 +16,8 @@ export interface IslandConfig {
   offsetY: number;
   hideWhenIdle: boolean;
   activities: Record<IslandActivity, boolean>;
+  musicTheme: string;
+  visualizer: boolean;
 }
 
 export type DockDesign = "glass" | "minimal" | "neon" | "classic" | "pills" | "win11";

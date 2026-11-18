@@ -7,6 +7,7 @@
 //!
 //! Live data (music, battery, network, downloads) comes from `sources`.
 
+pub mod audio;
 pub mod sources;
 
 use crate::config::{Config, IslandMonitor};
@@ -20,8 +21,8 @@ use tauri::{
 pub const LABEL_PREFIX: &str = "island-";
 /// Logical size of each island window. Big enough for the largest expanded
 /// pill at the "Large" size setting plus the top offset.
-const WIN_W: f64 = 560.0;
-const WIN_H: f64 = 320.0;
+const WIN_W: f64 = 760.0;
+const WIN_H: f64 = 380.0;
 
 /// Event names shared with the UI (src/island).
 pub const EV_STATE: &str = "island://state";
@@ -138,8 +139,32 @@ pub fn island_snapshot(app: AppHandle) -> sources::SystemState {
 
 /// Play/pause/next/previous for whatever app is playing media.
 #[tauri::command]
-pub async fn media_control(action: String) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || sources::media_control(&action))
+pub async fn media_control(action: String, value: Option<f64>) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || sources::media_control(&action, value))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Album art for the current track (data URL), if any.
+#[tauri::command]
+pub fn media_art(app: AppHandle) -> Option<String> {
+    sources::art(&app)
+}
+
+/// Current output level 0..1, for the audio-reactive visualizers.
+#[tauri::command]
+pub async fn audio_peak() -> f32 {
+    tauri::async_runtime::spawn_blocking(audio::peak).await.unwrap_or(0.0)
+}
+
+#[tauri::command]
+pub async fn audio_volume() -> f32 {
+    tauri::async_runtime::spawn_blocking(audio::volume).await.unwrap_or(0.0)
+}
+
+#[tauri::command]
+pub async fn audio_set_volume(level: f32) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || audio::set_volume(level))
         .await
         .map_err(|e| e.to_string())?
 }

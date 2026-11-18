@@ -5,8 +5,15 @@ import { listen } from "@tauri-apps/api/event";
 export interface Media {
   title: string;
   artist: string;
+  album: string;
   playing: boolean;
   app: string;
+  position: number;
+  duration: number;
+  updatedAt: number;
+  shuffle: boolean | null;
+  repeat: "none" | "track" | "list" | null;
+  artKey: string;
 }
 export interface Battery {
   percent: number;
@@ -33,7 +40,18 @@ export type IslandEvent =
 export const getSnapshot = () => invoke<SystemState>("island_snapshot");
 export const setHitRect = (rect: { x: number; y: number; w: number; h: number }) =>
   invoke("overlay_set_hit_rects", { rects: [rect] });
-export const mediaControl = (action: "toggle" | "next" | "prev") => invoke("media_control", { action });
+export const mediaControl = (action: "toggle" | "next" | "prev" | "shuffle" | "repeat" | "seek", value?: number) =>
+  invoke("media_control", { action, value: value ?? null });
+export const mediaArt = () => invoke<string | null>("media_art");
+export const audioPeak = () => invoke<number>("audio_peak");
+export const audioVolume = () => invoke<number>("audio_volume");
+export const setAudioVolume = (level: number) => invoke("audio_set_volume", { level });
+
+/** Position now, extrapolated from the last timeline update while playing. */
+export function livePosition(m: Media, now = Date.now()) {
+  const p = m.position + (m.playing && m.updatedAt ? (now - m.updatedAt) / 1000 : 0);
+  return m.duration ? Math.min(Math.max(p, 0), m.duration) : Math.max(p, 0);
+}
 export const openPath = (path: string) => invoke("open_path", { path });
 export const revealPath = (path: string) => invoke("reveal_path", { path });
 export const openSettings = () => invoke("open_settings");

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { getAppInfo, openConfigFolder, type AppInfo, type Config, type IslandActivity, type IslandConfig } from "../lib/config";
 import { islandDemo } from "../lib/island";
 import { DESIGNS, designVars } from "../island/designs";
+import { MUSIC_THEMES, gradient, shellStyle } from "../island/music/themes";
 import type { IslandDesign } from "../lib/config";
 import { AccentPicker, HotkeyRecorder, Row, Segmented, Toggle } from "./controls";
 
@@ -141,6 +142,10 @@ export function IslandSection({ config, update }: SectionProps) {
           </button>
         </Row>
         <DesignPicker value={isl.style} accent={config.appearance.accent} onChange={(v) => set({ style: v }, true)} />
+        <MusicThemePicker value={isl.musicTheme} onChange={(v) => set({ musicTheme: v }, true)} />
+        <Row label="Audio-reactive visualizer" description="Animated bars and waves that move with your PC's sound." htmlFor="island-viz">
+          <Toggle id="island-viz" label="Audio-reactive visualizer" checked={isl.visualizer} onChange={(v) => set({ visualizer: v })} />
+        </Row>
         <Row label="Size">
           <Segmented label="Island size" value={isl.size}
             options={[{ value: "small", label: "Small" }, { value: "medium", label: "Medium" }, { value: "large", label: "Large" }]}
@@ -224,6 +229,44 @@ function DesignPicker(props: { value: IslandDesign; accent: string; onChange: (d
                 <p className="text-[13px] font-medium">{d.label}</p>
                 <p className="text-[11.5px] text-muted">{d.description}</p>
               </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** Music player looks for the island, each with a small live-ish preview. */
+function MusicThemePicker(props: { value: string; onChange: (id: string) => void }) {
+  const opts = [{ id: "auto", label: "Match island design" }, ...MUSIC_THEMES];
+  return (
+    <div className="rounded-xl border border-line bg-panel p-4">
+      <p className="text-[14px] font-medium">Music player style</p>
+      <p className="mb-3 text-[12.5px] text-muted">How the island looks while music plays. Hover it for the player bar; click for the full player.</p>
+      <div role="radiogroup" aria-label="Music player style" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {opts.map((o) => {
+          const t = MUSIC_THEMES.find((x) => x.id === o.id);
+          const selected = o.id === props.value;
+          return (
+            <button key={o.id} type="button" role="radio" aria-checked={selected} onClick={() => props.onChange(o.id)}
+              className={`overflow-hidden rounded-xl border text-left transition ${selected ? "border-accent ring-2 ring-accent/40" : "border-line hover:border-muted"}`}>
+              <div className="flex h-16 items-center justify-center px-2" style={{ background: t?.light ? "linear-gradient(135deg,#e9edf5,#cfd6e4)" : "linear-gradient(135deg,#1b1530,#07080f)" }}>
+                {t ? (
+                  <div className="flex h-8 w-full items-center gap-1.5 rounded-full px-2" style={{ ...shellStyle(t), boxShadow: t.glow }}>
+                    <span className="h-5 w-5 shrink-0 rounded-[5px]" style={{ background: gradient(t, "135deg") }} />
+                    <span className="h-1.5 w-8 shrink-0 rounded-full" style={{ background: t.fg, opacity: 0.85 }} />
+                    <span className="flex h-4 flex-1 items-end justify-end gap-[2px]">
+                      {[5, 9, 6, 12, 8, 14, 10, 7, 11, 6].map((hh, i) => (
+                        <span key={i} style={{ width: 2, height: hh, borderRadius: 1, background: t.colors[i % 3] }} />
+                      ))}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-[11.5px] text-muted">Uses your island design</span>
+                )}
+              </div>
+              <div className="px-3 py-1.5 text-[12.5px] font-medium">{o.label}</div>
             </button>
           );
         })}

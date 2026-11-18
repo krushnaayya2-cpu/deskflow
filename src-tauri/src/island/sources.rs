@@ -20,9 +20,20 @@ use tauri::{AppHandle, Emitter, Manager};
 pub struct Media {
     pub title: String,
     pub artist: String,
+    pub album: String,
     pub playing: bool,
     /// App that owns the session, e.g. "Spotify.exe".
     pub app: String,
+    /// Playback position in seconds at `updated_at` (unix ms). The UI
+    /// extrapolates while playing, so this only changes on real updates.
+    pub position: f64,
+    pub duration: f64,
+    pub updated_at: i64,
+    pub shuffle: Option<bool>,
+    /// "none" | "track" | "list", when the app supports repeat.
+    pub repeat: Option<String>,
+    /// Changes when the track changes; the UI then fetches `media_art`.
+    pub art_key: String,
 }
 
 #[derive(Debug, Clone, Default, Serialize, PartialEq)]
@@ -52,6 +63,8 @@ pub struct SystemState {
 #[derive(Default)]
 struct Sources {
     state: Mutex<SystemState>,
+    /// Album art of the current track: (art_key, data URL).
+    art: Mutex<Option<(String, Option<String>)>>,
     /// Keeps the Downloads watcher alive for the life of the app.
     _watcher: Mutex<Option<notify::RecommendedWatcher>>,
 }
@@ -60,6 +73,11 @@ pub fn snapshot(app: &AppHandle) -> SystemState {
     app.try_state::<Sources>()
         .map(|s| s.state.lock().unwrap().clone())
         .unwrap_or_default()
+}
+
+/// Album art (data URL) for the current track, if the app provides one.
+pub fn art(app: &AppHandle) -> Option<String> {
+    app.try_state::<Sources>().and_then(|s| s.art.lock().unwrap().as_ref().and_then(|(_, a)| a.clone()))
 }
 
 pub fn start(app: &AppHandle) {
@@ -85,6 +103,15 @@ fn start_poller(app: AppHandle) {
                     battery: platform::read_battery(),
                     network: platform::read_network(),
                 };
+                // Fetch album art once per track (before announcing it).
+                if let Some(m) = &next.media {
+                    let sources = app.state::<Sources>();
+                    let stale = sources.art.lock().unwrap().as_ref().map(|(k, _)| k != &m.art_key).unwrap_or(true);
+                    if stale {
+                        let art = platform::read_art();
+                        *sources.art.lock().unwrap() = Some((m.art_key.clone(), art));
+                    }
+                }
                 let prev = {
                     let sources = app.state::<Sources>();
                     let mut cur = sources.state.lock().unwrap();
@@ -167,18 +194,24 @@ fn watch_downloads(app: AppHandle, dir: &Path) -> notify::Result<notify::Recomme
     Ok(watcher)
 }
 
-pub fn media_control(action: &str) -> Result<(), String> {
-    platform::media_control(action)
+pub fn media_control(action: &str, value: Option<f64>) -> Result<(), String> {
+    platform::media_control(action, value)
 }
 
 #[cfg(windows)]
 mod platform {
     use super::{Battery, Media, Network};
+    use base64::Engine;
     use windows::{
-        Media::Control::{
-            GlobalSystemMediaTransportControlsSessionManager as SessionManager,
-            GlobalSystemMediaTransportControlsSessionPlaybackStatus as PlaybackStatus,
+        Media::{
+            Control::{
+                GlobalSystemMediaTransportControlsSession as Session,
+                GlobalSystemMediaTransportControlsSessionManager as SessionManager,
+                GlobalSystemMediaTransportControlsSessionPlaybackStatus as PlaybackStatus,
+            },
+            MediaPlaybackAutoRepeatMode as Repeat,
         },
+        Storage::Streams::{Buffer, DataReader, IInputStream, InputStreamOptions},
         Networking::Connectivity::{NetworkConnectivityLevel, NetworkInformation},
         Win32::System::{
             Com::{CoInitializeEx, COINIT_MULTITHREADED},
@@ -207,24 +240,79 @@ mod platform {
         })
     }
 
+    fn session() -> Option<Session> {
+        manager()?.GetCurrentSession().ok()
+    }
+
+    /// 100 ns ticks since 1601 -> unix milliseconds.
+    fn filetime_to_unix_ms(t: i64) -> i64 {
+        (t - 116_444_736_000_000_000) / 10_000
+    }
+
     pub fn read_media() -> Option<Media> {
-        let session = manager()?.GetCurrentSession().ok()?;
+        let session = session()?;
         let props = session.TryGetMediaPropertiesAsync().ok()?.join().ok()?;
         let title = props.Title().ok()?.to_string();
         if title.is_empty() {
             return None;
         }
-        let playing = session
-            .GetPlaybackInfo()
-            .and_then(|i| i.PlaybackStatus())
+        let info = session.GetPlaybackInfo().ok();
+        let playing = info
+            .as_ref()
+            .and_then(|i| i.PlaybackStatus().ok())
             .map(|s| s == PlaybackStatus::Playing)
             .unwrap_or(false);
+        let shuffle = info.as_ref().and_then(|i| i.IsShuffleActive().ok()).and_then(|r| r.Value().ok());
+        let repeat = info
+            .as_ref()
+            .and_then(|i| i.AutoRepeatMode().ok())
+            .and_then(|r| r.Value().ok())
+            .map(|m| match m {
+                Repeat::Track => "track",
+                Repeat::List => "list",
+                _ => "none",
+            }
+            .to_string());
+        let (mut position, mut duration, mut updated_at) = (0.0, 0.0, 0);
+        if let Ok(t) = session.GetTimelineProperties() {
+            let secs = |ts: windows::Foundation::TimeSpan| ts.Duration as f64 / 10_000_000.0;
+            let start = t.StartTime().map(secs).unwrap_or(0.0);
+            duration = (t.EndTime().map(secs).unwrap_or(0.0) - start).max(0.0);
+            position = (t.Position().map(secs).unwrap_or(0.0) - start).max(0.0);
+            updated_at = t.LastUpdatedTime().map(|d| filetime_to_unix_ms(d.UniversalTime)).unwrap_or(0);
+        }
+        let artist = props.Artist().map(|a| a.to_string()).unwrap_or_default();
         Some(Media {
+            art_key: format!("{title}|{artist}"),
             title,
-            artist: props.Artist().map(|a| a.to_string()).unwrap_or_default(),
+            artist,
+            album: props.AlbumTitle().map(|a| a.to_string()).unwrap_or_default(),
             playing,
             app: session.SourceAppUserModelId().map(|a| a.to_string()).unwrap_or_default(),
+            position,
+            duration,
+            updated_at,
+            shuffle,
+            repeat,
         })
+    }
+
+    /// Album art of the current track as a data URL.
+    pub fn read_art() -> Option<String> {
+        let props = session()?.TryGetMediaPropertiesAsync().ok()?.join().ok()?;
+        let stream = props.Thumbnail().ok()?.OpenReadAsync().ok()?.join().ok()?;
+        let size = stream.Size().ok()?.min(4 * 1024 * 1024) as u32;
+        if size == 0 {
+            return None;
+        }
+        let input: IInputStream = windows::core::Interface::cast(&stream).ok()?;
+        let buf = Buffer::Create(size).ok()?;
+        let read = input.ReadAsync(&buf, size, InputStreamOptions::None).ok()?.join().ok()?;
+        let len = read.Length().ok()? as usize;
+        let mut bytes = vec![0u8; len];
+        DataReader::FromBuffer(&read).ok()?.ReadBytes(&mut bytes).ok()?;
+        let mime = if bytes.starts_with(&[0x89, b'P', b'N', b'G']) { "image/png" } else { "image/jpeg" };
+        Some(format!("data:{mime};base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes)))
     }
 
     pub fn read_battery() -> Option<Battery> {
@@ -252,16 +340,38 @@ mod platform {
         })
     }
 
-    pub fn media_control(action: &str) -> Result<(), String> {
+    pub fn media_control(action: &str, value: Option<f64>) -> Result<(), String> {
         init_thread();
-        let session = manager()
-            .ok_or("Media controls unavailable")?
-            .GetCurrentSession()
-            .map_err(|_| "Nothing is playing".to_string())?;
+        let session = session().ok_or("Nothing is playing")?;
         let op = match action {
             "toggle" => session.TryTogglePlayPauseAsync(),
             "next" => session.TrySkipNextAsync(),
             "prev" => session.TrySkipPreviousAsync(),
+            "shuffle" => {
+                let on = session
+                    .GetPlaybackInfo()
+                    .and_then(|i| i.IsShuffleActive())
+                    .and_then(|r| r.Value())
+                    .unwrap_or(false);
+                session.TryChangeShuffleActiveAsync(!on)
+            }
+            "repeat" => {
+                let cur = session
+                    .GetPlaybackInfo()
+                    .and_then(|i| i.AutoRepeatMode())
+                    .and_then(|r| r.Value())
+                    .unwrap_or(Repeat::None);
+                let next = match cur {
+                    Repeat::None => Repeat::List,
+                    Repeat::List => Repeat::Track,
+                    _ => Repeat::None,
+                };
+                session.TryChangeAutoRepeatModeAsync(next)
+            }
+            "seek" => {
+                let start = session.GetTimelineProperties().and_then(|t| t.StartTime()).map(|t| t.Duration).unwrap_or(0);
+                session.TryChangePlaybackPositionAsync(start + (value.unwrap_or(0.0) * 10_000_000.0) as i64)
+            }
             other => return Err(format!("Unknown media action {other:?}")),
         };
         op.and_then(|o| o.join()).map(|_| ()).map_err(|e| e.to_string())
@@ -282,8 +392,11 @@ mod platform {
     pub fn read_network() -> Option<Network> {
         None
     }
-    pub fn media_control(_action: &str) -> Result<(), String> {
+    pub fn media_control(_action: &str, _value: Option<f64>) -> Result<(), String> {
         Err("Media controls are only available on Windows".into())
+    }
+    pub fn read_art() -> Option<String> {
+        None
     }
 }
 
