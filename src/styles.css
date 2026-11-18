@@ -65,3 +65,11 @@ body {
     animation-duration: 0.01ms !important;
   }
 }
+
+/* Island design previews in settings reuse the island's animations. */
+@keyframes isl-flow {
+  from { background-position: 0 0, 0% 50%; }
+  to { background-position: 0 0, 300% 50%; }
+}
+.isl-flow { animation: isl-flow 4s linear infinite; }
+.isl-flow-slow { animation: isl-flow 14s ease-in-out infinite alternate; }

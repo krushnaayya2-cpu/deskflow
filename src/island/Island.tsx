@@ -29,6 +29,7 @@ import {
   type SystemState,
 } from "../lib/island";
 import * as I from "./icons";
+import { DESIGNS, designVars } from "./designs";
 
 const SCALE = { small: 0.85, medium: 1, large: 1.15 } as const;
 const SHAPES = {
@@ -152,10 +153,12 @@ export default function Island() {
 
   // ---- Geometry + hit area -----------------------------------------------
   const s = SCALE[config?.island.size ?? "medium"];
-  const offsetY = config?.island.offsetY ?? 8;
+  const design = config ? DESIGNS[config.island.style] ?? DESIGNS.glass : DESIGNS.glass;
+  const baseLook = design.look("#000");
+  const offsetY = baseLook.notch ? 0 : config?.island.offsetY ?? 8;
   const shape = SHAPES[mode];
   const w = shape.w * s;
-  const h = shape.h * s;
+  const h = shape.h * s * (mode === "idle" || mode === "compact" ? baseLook.heightScale ?? 1 : 1);
   useEffect(() => {
     setHitRect({ x: (window.innerWidth - w) / 2, y: offsetY, w, h }).catch(() => {});
   }, [w, h, offsetY]);
@@ -182,7 +185,7 @@ export default function Island() {
   };
 
   if (!config) return null;
-  const glass = config.island.style === "glass";
+  const look = (DESIGNS[config.island.style] ?? DESIGNS.glass).look(config.appearance.accent);
   const hidden = mode === "idle" && config.island.hideWhenIdle && !hovered;
   const glowing = current.kind === "transient";
 
@@ -192,22 +195,18 @@ export default function Island() {
         <m.div
           role="status"
           aria-live="polite"
-          className="pointer-events-auto relative cursor-default overflow-hidden text-white select-none"
-          style={{
-            background: glass ? "rgba(16,16,22,0.72)" : "#000",
-            border: glass ? "1px solid rgba(255,255,255,0.14)" : "1px solid rgba(255,255,255,0.04)",
-            backdropFilter: glass ? "blur(20px) saturate(160%)" : undefined,
-            fontSize: 13 * s,
-          }}
+          className={`pointer-events-auto relative cursor-default overflow-hidden select-none ${look.className ?? ""}`}
+          style={{ ...look.surface, ...designVars(look), fontSize: 13 * s }}
           initial={false}
           animate={{
             width: w,
             height: h,
-            borderRadius: shape.r * s,
+            borderTopLeftRadius: look.notch ? 0 : shape.r * s,
+            borderTopRightRadius: look.notch ? 0 : shape.r * s,
+            borderBottomLeftRadius: shape.r * s,
+            borderBottomRightRadius: shape.r * s,
             opacity: hidden ? 0 : 1,
-            boxShadow: glowing
-              ? `0 0 0 1px ${config.appearance.accent}88, 0 8px 30px ${config.appearance.accent}55`
-              : "0 6px 24px rgba(0,0,0,0.35)",
+            boxShadow: glowing ? look.glow(config.appearance.accent) : look.shadow,
           }}
           transition={SPRING}
           onPointerDown={onPointerDown}
@@ -258,7 +257,8 @@ function Btn(props: { label: string; onClick: () => void; children: ReactNode; s
         height: 30 * props.s,
         minWidth: 30 * props.s,
         padding: `0 ${10 * props.s}px`,
-        background: props.primary ? props.accent : "rgba(255,255,255,0.12)",
+        background: props.primary ? props.accent : "var(--isl-btn)",
+        color: props.primary ? "#fff" : undefined,
       }}
     >
       {props.children}
@@ -330,7 +330,7 @@ function Content(props: {
       );
       if (!big) {
         return (
-          <Row s={s} left={<Eq playing={md.playing} s={s} accent={accent} />} title={md.title} right={<span className="text-white/50">{md.artist}</span>} compact />
+          <Row s={s} left={<Eq playing={md.playing} s={s} accent={accent} />} title={md.title} right={<span className="isl-muted">{md.artist}</span>} compact />
         );
       }
       return (
@@ -405,7 +405,7 @@ function IdleInfo({ sys, s, details }: { sys: SystemState; s: number; details: b
         title={<span style={{ fontSize: 20 * s }} className="font-semibold tabular-nums">{time}</span>}
         subtitle={date}
         right={
-          <div className="flex items-center gap-3 text-white/80">
+          <div className="flex items-center gap-3 isl-soft">
             {n && (n.connected ? (n.wifi ? <I.Wifi width={16 * s} height={16 * s} /> : <I.Ethernet width={16 * s} height={16 * s} />) : <I.WifiOff width={16 * s} height={16 * s} />)}
             {sys.battery && (
               <span className="flex items-center gap-1">
@@ -417,7 +417,7 @@ function IdleInfo({ sys, s, details }: { sys: SystemState; s: number; details: b
         }
       />
       {details && (
-        <p className="text-white/50" style={{ fontSize: 12 * s }}>
+        <p className="isl-muted" style={{ fontSize: 12 * s }}>
           {n?.connected ? `Online via ${n.name || "network"}` : "Offline"} · Hold the island for quick actions
         </p>
       )}
@@ -428,7 +428,7 @@ function IdleInfo({ sys, s, details }: { sys: SystemState; s: number; details: b
 function QuickActions({ s, accent, media, onTimer }: { s: number; accent: string; media: Media | null; onTimer: (m: number) => void }) {
   return (
     <div className="flex w-full flex-col gap-2.5">
-      <p className="text-white/50" style={{ fontSize: 11 * s }}>Quick actions</p>
+      <p className="isl-muted" style={{ fontSize: 11 * s }}>Quick actions</p>
       <div className="flex flex-wrap items-center gap-2">
         {[1, 5, 15, 25].map((m) => (
           <Btn key={m} s={s} label={`Start ${m} minute timer`} onClick={() => onTimer(m)}>
@@ -454,7 +454,7 @@ function Row(props: { s: number; left?: ReactNode; title?: ReactNode; subtitle?:
       {props.left}
       <div className="min-w-0 flex-1">
         {props.title && <div className="truncate font-semibold leading-tight">{props.title}</div>}
-        {props.subtitle && <div className="truncate leading-tight text-white/55" style={{ fontSize: 12 * props.s, marginTop: 2 }}>{props.subtitle}</div>}
+        {props.subtitle && <div className="truncate leading-tight isl-muted" style={{ fontSize: 12 * props.s, marginTop: 2 }}>{props.subtitle}</div>}
       </div>
       {props.right && <div className={`shrink-0 ${props.compact ? "max-w-[40%] truncate" : ""}`}>{props.right}</div>}
     </div>
@@ -488,7 +488,7 @@ function Ring({ frac, size, accent, children }: { frac: number; size: number; ac
   return (
     <div className="relative flex shrink-0 items-center justify-center" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="absolute inset-0 -rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.15)" strokeWidth={3} fill="none" />
+        <circle cx={size / 2} cy={size / 2} r={r} stroke="var(--isl-track)" strokeWidth={3} fill="none" />
         <circle cx={size / 2} cy={size / 2} r={r} stroke={accent} strokeWidth={3} fill="none" strokeLinecap="round"
           strokeDasharray={c} strokeDashoffset={c * (1 - frac)} style={{ transition: "stroke-dashoffset .25s linear" }} />
       </svg>

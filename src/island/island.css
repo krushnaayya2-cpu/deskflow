@@ -32,3 +32,18 @@ button:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .eq-bar { animation: none; }
 }
+
+/* Design helpers: colours come from the selected design (designs.ts). */
+.isl-muted { color: var(--isl-muted); }
+.isl-soft { color: var(--isl-fg); opacity: 0.8; }
+
+@keyframes isl-flow {
+  from { background-position: 0 0, 0% 50%; }
+  to { background-position: 0 0, 300% 50%; }
+}
+.isl-flow { animation: isl-flow 4s linear infinite; }
+.isl-flow-slow { animation: isl-flow 14s ease-in-out infinite alternate; }
+
+@media (prefers-reduced-motion: reduce) {
+  .isl-flow, .isl-flow-slow { animation: none; }
+}

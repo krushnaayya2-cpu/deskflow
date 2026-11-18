@@ -6,11 +6,13 @@ export type ThemeMode = "system" | "dark" | "light";
 
 export type IslandActivity = "music" | "timer" | "battery" | "network" | "downloads";
 
+export type IslandDesign = "glass" | "solid" | "notch" | "neon" | "aurora" | "minimal" | "frost";
+
 export interface IslandConfig {
   enabled: boolean;
   monitor: "primary" | "all";
   size: "small" | "medium" | "large";
-  style: "glass" | "solid";
+  style: IslandDesign;
   offsetY: number;
   hideWhenIdle: boolean;
   activities: Record<IslandActivity, boolean>;

@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import { getAppInfo, openConfigFolder, type AppInfo, type Config, type IslandActivity, type IslandConfig } from "../lib/config";
 import { islandDemo } from "../lib/island";
+import { DESIGNS, designVars } from "../island/designs";
+import type { IslandDesign } from "../lib/config";
 import { AccentPicker, HotkeyRecorder, Row, Segmented, Toggle } from "./controls";
 
 export interface SectionProps {
@@ -138,15 +140,11 @@ export function IslandSection({ config, update }: SectionProps) {
             Show sample
           </button>
         </Row>
+        <DesignPicker value={isl.style} accent={config.appearance.accent} onChange={(v) => set({ style: v }, true)} />
         <Row label="Size">
           <Segmented label="Island size" value={isl.size}
             options={[{ value: "small", label: "Small" }, { value: "medium", label: "Medium" }, { value: "large", label: "Large" }]}
             onChange={(v) => set({ size: v })} />
-        </Row>
-        <Row label="Style" description="Glass is translucent; Solid is pure black.">
-          <Segmented label="Island style" value={isl.style}
-            options={[{ value: "glass", label: "Glass" }, { value: "solid", label: "Solid" }]}
-            onChange={(v) => set({ style: v })} />
         </Row>
         <Row label="Monitors">
           <Segmented label="Island monitors" value={isl.monitor}
@@ -173,6 +171,62 @@ export function IslandSection({ config, update }: SectionProps) {
           Hover the island to expand it, click for details, and press and hold for quick actions (timers, play/pause, settings).
           File-conversion progress and AI notifications appear here once those features are added.
         </p>
+      </div>
+    </div>
+  );
+}
+
+/** Grid of island designs with a live mini preview of each. */
+function DesignPicker(props: { value: IslandDesign; accent: string; onChange: (d: IslandDesign) => void }) {
+  const ids = Object.keys(DESIGNS) as IslandDesign[];
+  return (
+    <div className="rounded-xl border border-line bg-panel p-4">
+      <p className="mb-3 text-[14px] font-medium">Design</p>
+      <div role="radiogroup" aria-label="Island design" className="grid grid-cols-3 gap-3 lg:grid-cols-4">
+        {ids.map((id) => {
+          const d = DESIGNS[id];
+          const look = d.look(props.accent);
+          const selected = id === props.value;
+          return (
+            <button
+              key={id}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => props.onChange(id)}
+              className={`group overflow-hidden rounded-xl border text-left transition ${
+                selected ? "border-accent ring-2 ring-accent/40" : "border-line hover:border-muted"
+              }`}
+            >
+              <div
+                className="flex h-16 justify-center"
+                style={{ background: "linear-gradient(135deg,#3b1d4a,#0f172a 60%,#1e3a5f)", paddingTop: look.notch ? 0 : 10 }}
+              >
+                <div
+                  className={`flex h-7 w-32 items-center gap-2 px-3 text-[10px] font-semibold ${look.className ?? ""}`}
+                  style={{
+                    ...look.surface,
+                    ...designVars(look),
+                    borderRadius: look.notch ? "0 0 14px 14px" : 14,
+                    boxShadow: look.shadow,
+                    height: 28 * (look.heightScale ?? 1),
+                  }}
+                >
+                  <span className="flex items-end gap-[2px]" style={{ height: 10 }}>
+                    {[6, 10, 7, 9].map((h, i) => (
+                      <span key={i} style={{ width: 2, height: h, background: props.accent, borderRadius: 1 }} />
+                    ))}
+                  </span>
+                  <span className="truncate">Now playing</span>
+                </div>
+              </div>
+              <div className="px-3 py-2">
+                <p className="text-[13px] font-medium">{d.label}</p>
+                <p className="text-[11.5px] text-muted">{d.description}</p>
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

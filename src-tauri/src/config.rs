@@ -86,6 +86,16 @@ pub enum IslandStyle {
     Glass,
     /// Opaque black, like a phone's island.
     Solid,
+    /// Attached to the top edge of the screen, like a laptop notch.
+    Notch,
+    /// Black with an animated neon gradient border.
+    Neon,
+    /// Slowly shifting colour gradient.
+    Aurora,
+    /// Slim, borderless and subtle.
+    Minimal,
+    /// Light frosted glass with dark text.
+    Frost,
 }
 
 /// Which live activities the island shows.
