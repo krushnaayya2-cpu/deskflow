@@ -120,7 +120,10 @@ impl Default for IslandActivities {
 pub struct IslandConfig {
     pub enabled: bool,
     pub monitor: IslandMonitor,
+    /// Legacy preset; `scale` is used now (old Small/Large are migrated on load).
     pub size: IslandSize,
+    /// Island size in percent (60–170).
+    pub scale: u32,
     pub style: IslandStyle,
     /// Gap between the top of the screen and the island, in pixels.
     pub offset_y: u32,
@@ -139,6 +142,7 @@ impl Default for IslandConfig {
             enabled: true,
             monitor: IslandMonitor::Primary,
             size: IslandSize::Medium,
+            scale: 100,
             style: IslandStyle::Glass,
             offset_y: 8,
             hide_when_idle: false,
@@ -352,6 +356,8 @@ pub fn is_hex_color(a: &str) -> bool {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ConverterConfig {
+    /// Master switch. Off: no hover detection, no right-click entry, no drop zone.
+    pub enabled: bool,
     /// Round convert button when hovering a file on the desktop / in Explorer.
     pub hover_button: bool,
     /// How long the mouse must rest on a file before the button appears.
@@ -364,7 +370,7 @@ pub struct ConverterConfig {
 
 impl Default for ConverterConfig {
     fn default() -> Self {
-        Self { hover_button: true, hover_delay_ms: 600, context_menu: true, drop_zone: false }
+        Self { enabled: false, hover_button: true, hover_delay_ms: 600, context_menu: true, drop_zone: false }
     }
 }
 
@@ -448,6 +454,9 @@ impl Config {
         if self.island.music_theme.len() > 40 {
             return Err("Unknown music theme".into());
         }
+        if !(60..=170).contains(&self.island.scale) {
+            return Err("island size must be between 60% and 170%".into());
+        }
         if self.island.offset_y > 200 {
             return Err("Island offset must be 200 px or less".into());
         }
@@ -477,7 +486,17 @@ impl ConfigStore {
                 .map_err(|e| e.to_string())
                 .and_then(|s| serde_json::from_str::<Config>(&s).map_err(|e| e.to_string()))
             {
-                Ok(c) => c,
+                Ok(mut c) => {
+                    // Old Small / Large presets become a percentage.
+                    match c.island.size {
+                        IslandSize::Small => c.island.scale = 85,
+                        IslandSize::Large => c.island.scale = 115,
+                        IslandSize::Medium => {}
+                    }
+                    c.island.size = IslandSize::Medium;
+                    c.island.scale = c.island.scale.clamp(60, 170);
+                    c
+                }
                 Err(e) => {
                     // Keep the broken file for the user rather than silently
                     // overwriting it, then fall back to defaults.
@@ -522,6 +541,20 @@ impl ConfigStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn old_size_presets_become_scale_and_converter_starts_off() {
+        let dir = temp_dir("migrate");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("config.json"), r#"{"island":{"size":"large"},"converter":{"hoverButton":true}}"#).unwrap();
+        let (store, first) = ConfigStore::load(&dir);
+        assert!(!first);
+        let c = store.get();
+        assert_eq!(c.island.scale, 115);
+        assert_eq!(c.island.size, IslandSize::Medium);
+        assert!(!c.converter.enabled);
+        assert!(c.validate().is_ok());
+    }
 
     fn temp_dir(name: &str) -> PathBuf {
         let d = std::env::temp_dir().join(format!("deskflow-test-{name}-{}", std::process::id()));

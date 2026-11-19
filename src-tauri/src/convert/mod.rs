@@ -165,21 +165,32 @@ pub fn init(app: &AppHandle, cfg: &Config) {
             }
         })
         .expect("spawn convert worker");
-    hover::start(app.clone());
     sync(app, cfg);
 }
 
 /// Apply converter settings (right-click menu, drop zone).
 pub fn sync(app: &AppHandle, cfg: &Config) {
+    let on = cfg.converter.enabled;
     let exe = std::env::current_exe().map(|p| p.display().to_string()).unwrap_or_default();
-    if cfg.converter.context_menu {
+    if on && cfg.converter.context_menu {
         let _ = shell_menu::install(&exe);
     } else {
         let _ = shell_menu::uninstall();
     }
-    hover::set_enabled(cfg.converter.hover_button, cfg.converter.hover_delay_ms);
+    hover::set_enabled(on && cfg.converter.hover_button, cfg.converter.hover_delay_ms);
+    if on && cfg.converter.hover_button {
+        // The hover thread only exists once the feature is used.
+        static HOVER: std::sync::Once = std::sync::Once::new();
+        let app = app.clone();
+        HOVER.call_once(move || hover::start(app));
+    }
+    if !on {
+        if let Some(w) = app.get_webview_window(WINDOW) {
+            let _ = w.destroy();
+        }
+    }
     let dz = app.get_webview_window(DROPZONE);
-    match (cfg.converter.drop_zone, dz) {
+    match (on && cfg.converter.drop_zone, dz) {
         (true, None) => create_dropzone(app),
         (false, Some(w)) => {
             let _ = w.destroy();
@@ -368,6 +379,9 @@ fn create_dropzone(app: &AppHandle) {
 /// and open one menu for all of them.
 pub fn handle_args(app: &AppHandle, args: &[String]) {
     let Some(i) = args.iter().position(|a| a == "--convert") else { return };
+    if !app.state::<crate::config::ConfigStore>().get().converter.enabled {
+        return;
+    }
     let files: Vec<PathBuf> = args[i + 1..].iter().map(PathBuf::from).filter(|p| p.is_file()).collect();
     if files.is_empty() {
         return;

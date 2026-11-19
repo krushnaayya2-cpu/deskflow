@@ -5,7 +5,7 @@ import { islandDemo } from "../lib/island";
 import { DESIGNS, designVars } from "../island/designs";
 import { MUSIC_THEMES, gradient, shellStyle } from "../island/music/themes";
 import type { IslandDesign } from "../lib/config";
-import { AccentPicker, HotkeyRecorder, Row, Segmented, Toggle } from "./controls";
+import { AccentPicker, HotkeyRecorder, Row, Segmented, Slider, Toggle } from "./controls";
 
 export interface SectionProps {
   config: Config;
@@ -162,10 +162,23 @@ export function IslandSection({ config, update }: SectionProps) {
         <Row label="Audio-reactive visualizer" description="Animated bars and waves that move with your PC's sound." htmlFor="island-viz">
           <Toggle id="island-viz" label="Audio-reactive visualizer" checked={isl.visualizer} onChange={(v) => set({ visualizer: v })} />
         </Row>
-        <Row label="Size">
-          <Segmented label="Island size" value={isl.size}
-            options={[{ value: "small", label: "Small" }, { value: "medium", label: "Medium" }, { value: "large", label: "Large" }]}
-            onChange={(v) => set({ size: v })} />
+        <Row label="Size" description="Drag to make the island smaller or bigger. Applies to every mode: idle, music, alerts and AI cards." htmlFor="island-scale">
+          <div className="flex items-center gap-3">
+            <div className="flex gap-1">
+              {[
+                { label: "S", v: 85 },
+                { label: "M", v: 100 },
+                { label: "L", v: 120 },
+                { label: "XL", v: 145 },
+              ].map((p) => (
+                <button key={p.label} type="button" aria-label={`Size ${p.label}`} onClick={() => set({ scale: p.v }, true)}
+                  className={`rounded-md border px-2 py-0.5 text-[12px] ${isl.scale === p.v ? "border-accent bg-accent/15" : "border-line hover:bg-panel-hover"}`}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <Slider id="island-scale" label="Island size" min={60} max={170} step={5} value={isl.scale} unit="%" onChange={(v) => set({ scale: v })} />
+          </div>
         </Row>
         <Row label="Monitors">
           <Segmented label="Island monitors" value={isl.monitor}

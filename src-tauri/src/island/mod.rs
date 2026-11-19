@@ -31,7 +31,7 @@ pub const EV_EVENT: &str = "island://event";
 #[derive(Default)]
 pub struct IslandState {
     /// Which monitor setting the current windows were created for.
-    layout: Mutex<Option<IslandMonitor>>,
+    layout: Mutex<Option<(IslandMonitor, u32)>>,
 }
 
 /// A one-off island notification (download finished, charger plugged in...).
@@ -75,7 +75,8 @@ pub fn init(app: &AppHandle, cfg: &Config) {
 pub fn sync(app: &AppHandle, cfg: &Config) {
     let state = app.state::<IslandState>();
     let mut layout = state.layout.lock().unwrap();
-    let wanted = cfg.island.enabled.then_some(cfg.island.monitor);
+    // Windows grow with the island when it's bigger than 100%.
+    let wanted = cfg.island.enabled.then_some((cfg.island.monitor, cfg.island.scale.max(100)));
     if *layout == wanted {
         return;
     }
@@ -84,20 +85,21 @@ pub fn sync(app: &AppHandle, cfg: &Config) {
         let _ = w.destroy();
     }
     *layout = wanted;
-    let Some(which) = wanted else { return };
+    let Some((which, grow)) = wanted else { return };
+    let grow = grow as f64 / 100.0;
 
     let monitors = match which {
         IslandMonitor::Primary => app.primary_monitor().ok().flatten().into_iter().collect(),
         IslandMonitor::All => app.available_monitors().unwrap_or_default(),
     };
     for (i, m) in monitors.iter().enumerate() {
-        if let Err(e) = create_window(app, i, m) {
+        if let Err(e) = create_window(app, i, m, grow) {
             log::warn!("could not create island window {i}: {e}");
         }
     }
 }
 
-fn create_window(app: &AppHandle, i: usize, m: &tauri::Monitor) -> tauri::Result<()> {
+fn create_window(app: &AppHandle, i: usize, m: &tauri::Monitor, grow: f64) -> tauri::Result<()> {
     let label = format!("{LABEL_PREFIX}{i}");
     let w = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("island.html".into()))
         .title("DeskFlow Island")
@@ -106,7 +108,7 @@ fn create_window(app: &AppHandle, i: usize, m: &tauri::Monitor) -> tauri::Result
         .shadow(false)
         .always_on_top(true)
         .skip_taskbar(true)
-        .inner_size(WIN_W, WIN_H)
+        .inner_size(WIN_W * grow, WIN_H * grow)
         .resizable(false)
         .additional_browser_args(crate::windows::BROWSER_ARGS)
         .focused(false)
@@ -116,7 +118,7 @@ fn create_window(app: &AppHandle, i: usize, m: &tauri::Monitor) -> tauri::Result
     // Size and position in physical pixels of *this* monitor so mixed-DPI
     // setups line up correctly.
     let scale = m.scale_factor();
-    let size = PhysicalSize::new((WIN_W * scale) as u32, (WIN_H * scale) as u32);
+    let size = PhysicalSize::new((WIN_W * grow * scale) as u32, (WIN_H * grow * scale) as u32);
     let pos = m.position();
     let x = pos.x + (m.size().width as i32 - size.width as i32) / 2;
     w.set_size(size)?;

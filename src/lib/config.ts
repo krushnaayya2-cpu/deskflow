@@ -12,6 +12,8 @@ export interface IslandConfig {
   enabled: boolean;
   monitor: "primary" | "all";
   size: "small" | "medium" | "large";
+  /** Island size in percent (60–170). */
+  scale: number;
   style: IslandDesign;
   offsetY: number;
   hideWhenIdle: boolean;
@@ -73,6 +75,7 @@ export interface DockConfig {
 export interface ConverterConfig {
   hoverButton: boolean;
   hoverDelayMs: number;
+  enabled: boolean;
   contextMenu: boolean;
   dropZone: boolean;
 }

@@ -39,6 +39,8 @@ A dock with your pinned and running apps that can replace the Windows taskbar.
 
 ## File converter
 
+Turned off (and hidden from Settings) as of 0.8.1: no hover detection, right-click entry or drop zone runs. The code stays in `src-tauri/src/convert` and can be re-enabled with `"converter": {"enabled": true}` in config.json.
+
 - **Hover** a file on the desktop or in File Explorer for ~0.6 s → a round button appears next to the cursor → click for a radial menu of conversions. A progress ring and a success pulse follow; the result is saved next to the original and the Dynamic Island offers **Open**.
 - Also: **right-click → Convert with DeskFlow** (Windows 11: under "Show more options"), a floating **drop zone**, and **Settings → Converter → Choose files…**.
 - Built in (no extra software): JPG/PNG/WebP/BMP/GIF/TIFF ↔ PNG/JPG/WebP, images → PDF (several into one), merge PDFs, compress PDFs.

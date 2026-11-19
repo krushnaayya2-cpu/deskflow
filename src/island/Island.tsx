@@ -36,7 +36,6 @@ import { DESIGNS, designVars } from "./designs";
 import { autoTheme, findTheme, shellStyle } from "./music/themes";
 import { BarMusic, CompactMusic, Decoration, FullMusic, OrbitRing } from "./music/MusicViews";
 
-const SCALE = { small: 0.85, medium: 1, large: 1.15 } as const;
 const SHAPES = {
   idle: { w: 126, h: 32, r: 16 },
   compact: { w: 252, h: 36, r: 18 },
@@ -211,7 +210,7 @@ export default function Island() {
         : "compact";
 
   // ---- Geometry + hit area -----------------------------------------------
-  const s = SCALE[config?.island.size ?? "medium"];
+  const s = (config?.island.scale ?? 100) / 100;
   const design = config ? DESIGNS[config.island.style] ?? DESIGNS.glass : DESIGNS.glass;
   const baseLook = design.look("#000");
   const offsetY = baseLook.notch ? 0 : config?.island.offsetY ?? 8;

@@ -4,18 +4,16 @@ import { AnimatePresence, LazyMotion, domAnimation, m } from "framer-motion";
 import { getConfig, onConfigChanged, setConfig, type Config } from "../lib/config";
 import { applyTheme } from "../lib/theme";
 import { DockSection } from "./dock";
-import { ConverterSection } from "./converter";
 import { AiSection } from "./ai";
 import { AboutSection, AppearanceSection, ComingSoon, GeneralSection, IslandSection, type SectionProps } from "./sections";
 
-type SectionId = "general" | "appearance" | "dock" | "island" | "convert" | "desktop" | "ai" | "about";
+type SectionId = "general" | "appearance" | "dock" | "island" | "desktop" | "ai" | "about";
 
 const SECTIONS: { id: SectionId; label: string; icon: string; render: (p: SectionProps) => ReactElement }[] = [
   { id: "general", label: "General", icon: "⚙", render: (p) => <GeneralSection {...p} /> },
   { id: "appearance", label: "Appearance", icon: "◐", render: (p) => <AppearanceSection {...p} /> },
   { id: "island", label: "Dynamic Island", icon: "⬬", render: (p) => <IslandSection {...p} /> },
   { id: "dock", label: "Dock", icon: "▭", render: (p) => <DockSection {...p} /> },
-  { id: "convert", label: "Converter", icon: "◎", render: (p) => <ConverterSection {...p} /> },
   { id: "desktop", label: "Desktop", icon: "▦", render: () => <ComingSoon step={5} what="Fences, sorting rules and one-click clean with undo." /> },
   { id: "ai", label: "AI Apps", icon: "✦", render: (p) => <AiSection {...p} /> },
   { id: "about", label: "About", icon: "ⓘ", render: () => <AboutSection /> },
