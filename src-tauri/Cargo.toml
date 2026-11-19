@@ -1,6 +1,6 @@
 [package]
 name = "deskflow"
-version = "0.8.3"
+version = "0.8.4"
 description = "DeskFlow - desktop organizer, glass dock, Dynamic Island and file converter for Windows 11"
 edition = "2021"
 rust-version = "1.80"

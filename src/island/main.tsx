@@ -1,3 +1,5 @@
+import { catchErrors } from "../lib/diag";
+catchErrors();
 import { createRoot } from "react-dom/client";
 import Island from "./Island";
 import "./island.css";

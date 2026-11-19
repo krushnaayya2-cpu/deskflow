@@ -94,7 +94,7 @@ pub fn sync(app: &AppHandle, cfg: &Config) {
     };
     for (i, m) in monitors.iter().enumerate() {
         if let Err(e) = create_window(app, i, m, grow) {
-            log::warn!("could not create island window {i}: {e}");
+            crate::diag::trace(&format!("island window {i} failed: {e}"));
         }
     }
 }
@@ -123,6 +123,7 @@ fn create_window(app: &AppHandle, i: usize, m: &tauri::Monitor, grow: f64) -> ta
     let x = pos.x + (m.size().width as i32 - size.width as i32) / 2;
     w.set_size(size)?;
     w.set_position(PhysicalPosition::new(x, pos.y))?;
+    crate::diag::trace(&format!("island window {i}: {}x{} at {},{} (monitor {}x{} @{})", size.width, size.height, x, pos.y, m.size().width, m.size().height, scale));
     crate::overlay::make_no_activate(&w);
     w.show()?;
     // After show(): the native window must exist before it can be made

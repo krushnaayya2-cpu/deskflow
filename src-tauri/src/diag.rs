@@ -30,3 +30,9 @@ pub fn init() {
         prev(info);
     }));
 }
+
+/// Errors from the web pages (island, dock, settings) end up in the same log.
+#[tauri::command]
+pub fn diag_log(window: tauri::WebviewWindow, msg: String) {
+    trace(&format!("[{}] {}", window.label(), msg.chars().take(600).collect::<String>()));
+}

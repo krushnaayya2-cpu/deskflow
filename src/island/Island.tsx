@@ -12,6 +12,7 @@
 // it is click-through.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { diag } from "../lib/diag";
 import { getTasks, onNotify, onTasks, type AiNotification, type AiTask } from "../lib/ai";
 import { aiLook, COMPLETED_MS, noteLook, pickTask } from "./ai/AiViews";
 import { AnimatePresence, LazyMotion, domAnimation, m } from "framer-motion";
@@ -89,9 +90,16 @@ export default function Island() {
 
   // ---- Data subscriptions ------------------------------------------------
   useEffect(() => {
-    getConfig().then((c) => ((cfgRef.current = c), setConfig(c)));
+    getConfig()
+      .then((c) => {
+        cfgRef.current = c;
+        setConfig(c);
+        diag(`island config: scale=${c.island.scale} style=${c.island.style} hideWhenIdle=${c.island.hideWhenIdle}`);
+      })
+      .catch((e) => diag(`get_config failed: ${e}`));
     getSnapshot().then(setSys).catch(() => {});
-    getTasks().then(setAiTasks).catch(() => {});
+    getTasks().then(setAiTasks).catch((e) => diag(`ai_tasks failed: ${e}`));
+    diag(`island page loaded ${window.innerWidth}x${window.innerHeight}`);
     const subs = [
       onTasks(setAiTasks),
       onNotify((n) => {

@@ -1,3 +1,5 @@
+import { catchErrors } from "../lib/diag";
+catchErrors();
 import { createRoot } from "react-dom/client";
 import Dock from "./Dock";
 import "./dock.css";

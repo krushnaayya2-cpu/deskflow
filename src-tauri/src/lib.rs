@@ -50,6 +50,7 @@ pub fn run() {
             commands::get_app_info,
             commands::open_config_folder,
             perf::perf_stats,
+            diag::diag_log,
             ai::ai_tasks,
             ai::ai_decide,
             ai::ai_dismiss,
