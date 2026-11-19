@@ -23,7 +23,7 @@ async function poll() {
     } catch {
       raw = 0;
     }
-    await new Promise((r) => setTimeout(r, 33));
+    await new Promise((r) => setTimeout(r, 50)); // 20 Hz is plenty for a smoothed level
   }
   polling = false;
 }
@@ -231,7 +231,7 @@ function drawChrome(c: Ctx, w: number, h: number, t: number, lv: number) {
   c.globalAlpha = 1;
 }
 
-export function Visualizer(props: { kind: VizKind; colors: string[]; playing: boolean; width?: number; height: number }) {
+export function Visualizer(props: { kind: VizKind; colors: string[]; playing: boolean; width?: number; height: number; fps?: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const [measured, setMeasured] = useState(0);
@@ -250,9 +250,17 @@ export function Visualizer(props: { kind: VizKind; colors: string[]; playing: bo
     subscribers++;
     poll();
     let raf = 0;
+    let lastDraw = 0;
     const frame = (now: number) => {
       const cv = ref.current;
       const p = propsRef.current;
+      // Frame-rate cap: fewer redraws = less CPU/GPU, visually identical
+      // for these smooth shapes.
+      if (now - lastDraw < 1000 / (p.fps ?? 40) - 2) {
+        raf = requestAnimationFrame(frame);
+        return;
+      }
+      lastDraw = now;
       if (cv) {
         const dpr = window.devicePixelRatio || 1;
         if (!p.width) {

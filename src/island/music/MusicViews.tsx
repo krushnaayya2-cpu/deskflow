@@ -85,7 +85,7 @@ export function CompactMusic({ media, theme, art, s, viz }: MusicProps) {
       <Btn t={theme} size={26 * s} label={media.playing ? "Pause" : "Play"} onClick={() => mediaControl("toggle")} primary>
         <PlayIcon playing={media.playing} size={11 * s} />
       </Btn>
-      {viz && <Visualizer kind={theme.viz === "chrome" || theme.viz === "ribbon" ? "lines" : theme.viz === "mirror" ? "bars" : theme.viz} colors={theme.colors} playing={media.playing} width={64 * s} height={18 * s} />}
+      {viz && <Visualizer kind={theme.viz === "chrome" || theme.viz === "ribbon" ? "lines" : theme.viz === "mirror" ? "bars" : theme.viz} colors={theme.colors} playing={media.playing} width={64 * s} height={18 * s} fps={24} />}
     </div>
   );
 }

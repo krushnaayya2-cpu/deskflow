@@ -95,7 +95,12 @@ scripts/build.ps1        Local build script
 
 ## Performance targets
 
-Idle RAM under 80 MB, idle CPU near 0%, startup under 2 seconds, 60 fps animations. Each window loads only its own bundle, the backend is event-driven (no polling loops), and release builds use LTO with a stripped binary. A measured performance pass happens in step 7.
+Idle RAM under 80 MB, idle CPU near 0%, startup under 2 seconds, 60 fps animations. Each window loads only its own bundle, the backend is event-driven (no polling loops), and release builds use LTO with a stripped binary. Performance work (v0.6.0):
+- The settings window is created only when opened and destroyed when closed, so it uses no memory while DeskFlow sits in the tray. With the island and dock turned off, no browser engine runs at all.
+- All windows share one WebView2 browser process and renderer; the island and dock ask WebView2 to keep memory low while the mouse isn't over them.
+- Running apps are tracked from Windows window events instead of polling; the hover check slows down when the mouse is far away; battery/network are read every 5 s.
+- Visualizers are capped at 24–40 fps; animated island borders only run while the island is expanded.
+- Settings → About shows live memory (as Task Manager reports it), CPU and startup time.
 
 ## Privacy
 

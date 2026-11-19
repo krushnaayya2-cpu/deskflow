@@ -142,6 +142,7 @@ fn create(app: &AppHandle, i: usize, m: &tauri::Monitor, pos: DockPosition, full
         .always_on_top(true)
         .skip_taskbar(true)
         .resizable(false)
+        .additional_browser_args(crate::windows::BROWSER_ARGS)
         .focused(false)
         .visible(false)
         .build()?;
@@ -150,6 +151,7 @@ fn create(app: &AppHandle, i: usize, m: &tauri::Monitor, pos: DockPosition, full
     overlay::make_no_activate(&win);
     win.show()?;
     win.set_ignore_cursor_events(true)?;
+    crate::windows::set_low_memory(&win, true);
     Ok(())
 }
 

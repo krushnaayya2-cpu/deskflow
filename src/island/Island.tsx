@@ -229,7 +229,7 @@ export default function Island() {
         <m.div
           role="status"
           aria-live="polite"
-          className={`pointer-events-auto relative cursor-default overflow-hidden select-none ${themed ? "" : look.className ?? ""}`}
+          className={`pointer-events-auto relative cursor-default overflow-hidden select-none ${themed || mode === "idle" || mode === "compact" ? "" : look.className ?? ""}`}
           style={{ ...surface, fontSize: 13 * s }}
           initial={false}
           animate={{

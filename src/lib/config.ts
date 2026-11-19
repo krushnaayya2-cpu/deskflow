@@ -100,6 +100,7 @@ export const onConfigChanged = (cb: (c: Config) => void): Promise<UnlistenFn> =>
 
 export interface PerfStats {
   memoryMb: number;
+  workingSetMb: number;
   privateMb: number;
   cpuPercent: number;
   processes: number;

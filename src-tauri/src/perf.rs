@@ -7,8 +7,11 @@ use serde::Serialize;
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PerfStats {
-    /// Working set of all DeskFlow processes, in MB.
+    /// Private working set of all DeskFlow processes, in MB — the figure
+    /// Task Manager shows in its Memory column.
     pub memory_mb: f64,
+    /// Full working set including memory shared with other programs.
+    pub working_set_mb: f64,
     /// Private (committed) memory, in MB.
     pub private_mb: f64,
     /// CPU use since the previous call, as % of the whole machine.
@@ -40,7 +43,7 @@ mod imp {
         Foundation::{CloseHandle, FILETIME},
         System::{
             Diagnostics::ToolHelp::{CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS},
-            ProcessStatus::{GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS, PROCESS_MEMORY_COUNTERS_EX},
+            ProcessStatus::{GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS, PROCESS_MEMORY_COUNTERS_EX2},
             Threading::{GetCurrentProcessId, GetProcessTimes, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION},
         },
     };
@@ -80,13 +83,14 @@ mod imp {
 
     pub fn sample() -> PerfStats {
         let pids = family();
-        let (mut ws, mut private, mut cpu_ticks) = (0u64, 0u64, 0u64);
+        let (mut ws, mut pws, mut private, mut cpu_ticks) = (0u64, 0u64, 0u64, 0u64);
         for pid in &pids {
             unsafe {
                 let Ok(h) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, *pid) else { continue };
-                let mut m = PROCESS_MEMORY_COUNTERS_EX { cb: std::mem::size_of::<PROCESS_MEMORY_COUNTERS_EX>() as u32, ..Default::default() };
+                let mut m = PROCESS_MEMORY_COUNTERS_EX2 { cb: std::mem::size_of::<PROCESS_MEMORY_COUNTERS_EX2>() as u32, ..Default::default() };
                 if GetProcessMemoryInfo(h, &mut m as *mut _ as *mut PROCESS_MEMORY_COUNTERS, m.cb).is_ok() {
                     ws += m.WorkingSetSize as u64;
+                    pws += m.PrivateWorkingSetSize as u64;
                     private += m.PrivateUsage as u64;
                 }
                 let (mut c, mut e, mut k, mut u) = Default::default();
@@ -108,7 +112,8 @@ mod imp {
         };
         *last = Some((now, cpu_ticks));
         PerfStats {
-            memory_mb: ws as f64 / 1_048_576.0,
+            memory_mb: pws as f64 / 1_048_576.0,
+            working_set_mb: ws as f64 / 1_048_576.0,
             private_mb: private as f64 / 1_048_576.0,
             cpu_percent: cpu,
             processes: pids.len() as u32,

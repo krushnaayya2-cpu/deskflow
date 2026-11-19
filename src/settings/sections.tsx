@@ -99,7 +99,7 @@ export function AboutSection() {
   const mono = "font-mono text-[13px] text-muted tabular-nums";
   return (
     <div className="space-y-2.5">
-      <Row label="Memory" description={`All DeskFlow processes (${perf?.processes ?? "…"}), including its WebView2 helpers.`}>
+      <Row label="Memory" description={`Same as Task Manager's Memory column, for all DeskFlow processes (${perf?.processes ?? "…"}) including WebView2 helpers. Including memory shared with Windows: ${perf ? perf.workingSetMb.toFixed(0) : "…"} MB.`}>
         <span className={mono}>{perf ? `${perf.memoryMb.toFixed(0)} MB` : "…"}</span>
       </Row>
       <Row label="CPU" description="Average over the last 2 seconds, share of the whole PC.">

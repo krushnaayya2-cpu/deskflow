@@ -44,6 +44,7 @@ pub fn start(app: &AppHandle) {
         .name("dock-apps".into())
         .spawn(move || {
             platform::init_thread();
+            platform::watch_windows();
             loop {
                 let mut next = platform::list_running();
                 let state = app.state::<AppsState>();
@@ -57,7 +58,10 @@ pub fn start(app: &AppHandle) {
                         let _ = app.emit(EV_RUNNING, &next);
                     }
                 }
-                std::thread::sleep(Duration::from_millis(700));
+                // Sleep until Windows reports a window change (or 5 s pass as a
+                // safety net), then let a burst of events settle briefly.
+                platform::wait_for_change(Duration::from_secs(5));
+                std::thread::sleep(Duration::from_millis(200));
             }
         })
         .expect("spawn dock apps thread");
@@ -185,6 +189,21 @@ fn walk_lnks(dir: &std::path::Path, depth: u32, out: &mut Vec<PinnedApp>) {
 
 pub use platform::{activate, close_all, init_thread, open_start_menu, shell_shortcut};
 
+/// Set by the window-event hook, consumed by the scanner thread.
+static CHANGED: (std::sync::Mutex<bool>, std::sync::Condvar) = (std::sync::Mutex::new(false), std::sync::Condvar::new());
+
+#[cfg_attr(not(windows), allow(dead_code))]
+fn signal_change() {
+    *CHANGED.0.lock().unwrap() = true;
+    CHANGED.1.notify_one();
+}
+
+fn wait_changed(timeout: Duration) {
+    let guard = CHANGED.0.lock().unwrap();
+    let (mut g, _) = CHANGED.1.wait_timeout_while(guard, timeout, |changed| !*changed).unwrap();
+    *g = false;
+}
+
 #[cfg(windows)]
 mod platform {
     use super::{stem_name, AppWindow, RunningApp};
@@ -220,6 +239,49 @@ mod platform {
         unsafe {
             let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
         }
+    }
+
+    unsafe extern "system" fn on_event(
+        _hook: windows::Win32::UI::Accessibility::HWINEVENTHOOK,
+        _event: u32,
+        _hwnd: HWND,
+        id_object: i32,
+        id_child: i32,
+        _thread: u32,
+        _time: u32,
+    ) {
+        // Only whole windows matter (not carets, scrollbars, menu items...).
+        if id_object == 0 && id_child == 0 {
+            super::signal_change();
+        }
+    }
+
+    /// Start a thread that receives window create/destroy/show/hide/rename/
+    /// focus events from Windows. Runs a message loop, as the hooks require.
+    pub fn watch_windows() {
+        use windows::Win32::UI::{
+            Accessibility::SetWinEventHook,
+            WindowsAndMessaging::{DispatchMessageW, GetMessageW, TranslateMessage, MSG, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS},
+        };
+        std::thread::Builder::new()
+            .name("dock-winevents".into())
+            .spawn(|| unsafe {
+                // foreground; minimise start/end; create/destroy/show/hide;
+                // name change; cloaked/uncloaked (virtual desktops, UWP).
+                for (lo, hi) in [(0x0003, 0x0003), (0x0016, 0x0017), (0x8000, 0x8003), (0x800C, 0x800C), (0x8017, 0x8018)] {
+                    SetWinEventHook(lo, hi, None, Some(on_event), 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
+                }
+                let mut msg = MSG::default();
+                while GetMessageW(&mut msg, None, 0, 0).as_bool() {
+                    let _ = TranslateMessage(&msg);
+                    DispatchMessageW(&msg);
+                }
+            })
+            .ok();
+    }
+
+    pub fn wait_for_change(timeout: std::time::Duration) {
+        super::wait_changed(timeout);
     }
 
     unsafe extern "system" fn collect(hwnd: HWND, lp: LPARAM) -> BOOL {
@@ -495,6 +557,10 @@ mod platform {
 mod platform {
     use super::RunningApp;
     pub fn init_thread() {}
+    pub fn watch_windows() {}
+    pub fn wait_for_change(timeout: std::time::Duration) {
+        super::wait_changed(timeout);
+    }
     pub fn list_running() -> Vec<RunningApp> {
         Vec::new()
     }

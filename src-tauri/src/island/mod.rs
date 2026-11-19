@@ -108,6 +108,7 @@ fn create_window(app: &AppHandle, i: usize, m: &tauri::Monitor) -> tauri::Result
         .skip_taskbar(true)
         .inner_size(WIN_W, WIN_H)
         .resizable(false)
+        .additional_browser_args(crate::windows::BROWSER_ARGS)
         .focused(false)
         .visible(false)
         .build()?;
@@ -125,6 +126,7 @@ fn create_window(app: &AppHandle, i: usize, m: &tauri::Monitor) -> tauri::Result
     // After show(): the native window must exist before it can be made
     // click-through.
     w.set_ignore_cursor_events(true)?;
+    crate::windows::set_low_memory(&w, true);
     Ok(())
 }
 

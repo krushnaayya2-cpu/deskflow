@@ -97,12 +97,17 @@ fn start_poller(app: AppHandle) {
         .spawn(move || {
             platform::init_thread();
             let mut first = true;
+            let mut tick: u64 = 0;
+            let (mut battery, mut network) = (None, None);
             loop {
-                let next = SystemState {
-                    media: platform::read_media(),
-                    battery: platform::read_battery(),
-                    network: platform::read_network(),
-                };
+                // Music changes often; battery and network rarely, so they
+                // are read every 5 s instead of every second.
+                if tick % 5 == 0 {
+                    battery = platform::read_battery();
+                    network = platform::read_network();
+                }
+                tick += 1;
+                let next = SystemState { media: platform::read_media(), battery: battery.clone(), network: network.clone() };
                 // Fetch album art once per track (before announcing it).
                 if let Some(m) = &next.media {
                     let sources = app.state::<Sources>();

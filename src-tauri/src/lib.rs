@@ -15,7 +15,7 @@ mod tray;
 mod windows;
 
 use config::ConfigStore;
-use tauri::{Manager, RunEvent, WindowEvent};
+use tauri::{Manager, RunEvent};
 
 /// Command-line flag the autostart entry passes, so we can tell a login
 /// launch (stay quietly in the tray) from a manual launch.
@@ -93,15 +93,6 @@ pub fn run() {
                 windows::show_settings(handle);
             }
             Ok(())
-        })
-        .on_window_event(|window, event| {
-            // Closing settings only hides it; DeskFlow keeps running in the tray.
-            if let WindowEvent::CloseRequested { api, .. } = event {
-                if window.label() == windows::SETTINGS {
-                    api.prevent_close();
-                    let _ = window.hide();
-                }
-            }
         })
         .build(tauri::generate_context!())
         .expect("failed to start DeskFlow");
