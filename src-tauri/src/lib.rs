@@ -108,6 +108,11 @@ pub fn run() {
             diag::trace("tray::create");
             tray::create(handle, &cfg)?;
             windows::apply_theme(handle, cfg.appearance.theme);
+            // Before any window exists: the island and dock pages ask for AI
+            // tasks as soon as they load, and a command that finds no state
+            // aborts the whole app.
+            diag::trace("ai::init");
+            ai::init(handle, &cfg);
             diag::trace("overlay::init");
             overlay::init(handle);
             diag::trace("island::init");
@@ -116,8 +121,6 @@ pub fn run() {
             dock::init(handle, &cfg);
             diag::trace("convert::init");
             convert::init(handle, &cfg);
-            diag::trace("ai::init");
-            ai::init(handle, &cfg);
             let args: Vec<String> = std::env::args().collect();
             convert::handle_args(handle, &args);
             perf::mark_started(started);
