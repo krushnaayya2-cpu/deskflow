@@ -11,7 +11,7 @@ Built with **Tauri 2** (Rust + React/TypeScript + Tailwind). No Electron, no tel
 | 1 | Project setup, tray app, settings, autostart, global hotkey | ✅ Done |
 | 3 | Dynamic Island (built early, on request) | ✅ Done |
 | 2 | Glass dock and theme system | ✅ Done |
-| 4 | Hover-to-convert circle menu and conversion engine | Planned |
+| 4 | Hover-to-convert circle menu and conversion engine | ✅ Done |
 | 5 | Desktop organizer | Planned |
 | 6 | AI spotlight and notifications | Planned |
 | 7 | Performance pass and installer polish | Planned |
@@ -36,6 +36,14 @@ A dock with your pinned and running apps that can replace the Windows taskbar.
 - Settings → *Dock*: icon size, spacing, corner radius, blur strength, opacity, accent, magnification, glass/solid/transparent background, bottom/left/right, auto-hide, main or all displays, Start button, clock, running apps, add apps from the Start menu.
 - **Hide the Windows taskbar** (optional). DeskFlow restores it, with its original auto-hide setting, when you turn the option off or quit.
 - Themes: presets for every design plus Onyx, Silver, Indigo outline, Night shelf, Dusk pebble and Sage capsules, save your own, and export/import themes as `.json` files.
+
+## File converter
+
+- **Hover** a file on the desktop or in File Explorer for ~0.6 s → a round button appears next to the cursor → click for a radial menu of conversions. A progress ring and a success pulse follow; the result is saved next to the original and the Dynamic Island offers **Open**.
+- Also: **right-click → Convert with DeskFlow** (Windows 11: under "Show more options"), a floating **drop zone**, and **Settings → Converter → Choose files…**.
+- Built in (no extra software): JPG/PNG/WebP/BMP/GIF/TIFF ↔ PNG/JPG/WebP, images → PDF (several into one), merge PDFs, compress PDFs.
+- With free tools DeskFlow can install for you (via winget): **LibreOffice** (Word/PowerPoint/Excel → PDF, PDF → Word), **FFmpeg** (MP4 → MP3/GIF/WAV, MOV/MKV → MP4, audio formats), **Poppler** (PDF → JPG pages).
+- Conversions run one at a time in the background; nothing leaves your PC.
 
 ## Dynamic Island
 

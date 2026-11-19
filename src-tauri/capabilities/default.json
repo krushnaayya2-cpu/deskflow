@@ -5,7 +5,9 @@
   "windows": [
     "settings",
     "island-*",
-    "dock-*"
+    "dock-*",
+    "convert",
+    "dropzone"
   ],
   "permissions": [
     "core:default"

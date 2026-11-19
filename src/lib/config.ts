@@ -70,6 +70,13 @@ export interface DockConfig {
   originalTaskbarAutohide: boolean | null;
 }
 
+export interface ConverterConfig {
+  hoverButton: boolean;
+  hoverDelayMs: number;
+  contextMenu: boolean;
+  dropZone: boolean;
+}
+
 export interface Config {
   version: number;
   general: {
@@ -82,6 +89,7 @@ export interface Config {
   };
   island: IslandConfig;
   dock: DockConfig;
+  converter: ConverterConfig;
 }
 
 export interface AppInfo {

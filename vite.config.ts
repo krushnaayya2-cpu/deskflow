@@ -20,6 +20,7 @@ export default defineConfig({
         settings: resolve(root, "settings.html"),
         island: resolve(root, "island.html"),
         dock: resolve(root, "dock.html"),
+        convert: resolve(root, "convert.html"),
       },
     },
   },
