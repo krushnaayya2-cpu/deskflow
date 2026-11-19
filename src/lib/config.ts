@@ -77,6 +77,18 @@ export interface ConverterConfig {
   dropZone: boolean;
 }
 
+export interface AiConfig {
+  apiEnabled: boolean;
+  apiPort: number;
+  apiToken: string;
+  style: string;
+  dnd: boolean;
+  sound: boolean;
+  apps: PinnedApp[];
+  appsScanned: boolean;
+  dockSection: boolean;
+}
+
 export interface Config {
   version: number;
   general: {
@@ -90,6 +102,7 @@ export interface Config {
   island: IslandConfig;
   dock: DockConfig;
   converter: ConverterConfig;
+  ai: AiConfig;
 }
 
 export interface AppInfo {

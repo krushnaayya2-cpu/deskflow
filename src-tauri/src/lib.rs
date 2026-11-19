@@ -4,6 +4,7 @@
 //! global settings hotkey, settings window) and the Dynamic Island. Later
 //! steps add modules (dock, converter, organizer, ai) next to these.
 
+mod ai;
 mod commands;
 mod config;
 mod convert;
@@ -47,6 +48,15 @@ pub fn run() {
             commands::get_app_info,
             commands::open_config_folder,
             perf::perf_stats,
+            ai::ai_tasks,
+            ai::ai_decide,
+            ai::ai_dismiss,
+            ai::ai_open,
+            ai::ai_history,
+            ai::ai_clear_history,
+            ai::ai_api_info,
+            ai::ai_detect_apps,
+            ai::ai_demo,
             convert::convert_pending,
             convert::convert_expand,
             convert::convert_start,
@@ -99,6 +109,7 @@ pub fn run() {
             island::init(handle, &cfg);
             dock::init(handle, &cfg);
             convert::init(handle, &cfg);
+            ai::init(handle, &cfg);
             let args: Vec<String> = std::env::args().collect();
             convert::handle_args(handle, &args);
             perf::mark_started(started);

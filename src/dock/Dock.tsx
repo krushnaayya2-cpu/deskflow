@@ -27,12 +27,13 @@ import {
 import { dockLook, itemStyle } from "./designs";
 import { getSnapshot, onState, type SystemState } from "../lib/island";
 import type { IconStyle } from "../lib/config";
+import { getTasks, onTasks } from "../lib/ai";
 
 type Item =
   | { kind: "start"; id: string }
   | { kind: "search"; id: string }
   | { kind: "tray"; id: string }
-  | { kind: "app"; id: string; name: string; path: string; key: string; pin?: PinnedApp; app?: RunningApp }
+  | { kind: "app"; id: string; name: string; path: string; key: string; pin?: PinnedApp; app?: RunningApp; ai?: boolean }
   | { kind: "sep"; id: string }
   | { kind: "clock"; id: string };
 
@@ -65,6 +66,14 @@ export default function Dock() {
   const [win, setWin] = useState({ w: window.innerWidth, h: window.innerHeight });
   const [sys, setSys] = useState<SystemState>({ media: null, battery: null, network: null });
   const cfgRef = useRef<Config | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
+
+  useEffect(() => {
+    const busy = (ts: { status: string }[]) => setAiBusy(ts.some((t) => t.status === "running" || t.status === "permission"));
+    getTasks().then(busy).catch(() => {});
+    const un = onTasks(busy);
+    return () => void un.then((f) => f());
+  }, []);
 
   useEffect(() => {
     const show = (c: Config) => ((cfgRef.current = c), setLocal(c));
@@ -98,7 +107,17 @@ export default function Dock() {
     if (dock.showStart) out.push({ kind: "start", id: "start" });
     if (dock.showSearch) out.push({ kind: "search", id: "search" });
     const usedKeys = new Set<string>();
+    // AI section: detected AI apps first, inside a glowing ring.
+    const aiApps = config?.ai.dockSection ? config.ai.apps : [];
+    const aiPaths = new Set(aiApps.map((a) => a.path.toLowerCase()));
+    for (const pin of aiApps) {
+      const app = pin.target ? running.find((r) => r.key === pin.target) : undefined;
+      if (app) usedKeys.add(app.key);
+      out.push({ kind: "app", id: `ai:${pin.path}`, name: pin.name, path: pin.path, key: pin.target, app, ai: true });
+    }
+    if (aiApps.length && pinned.length) out.push({ kind: "sep", id: "sep-ai" });
     for (const pin of pinned) {
+      if (aiPaths.has(pin.path.toLowerCase())) continue;
       const app = pin.target ? running.find((r) => r.key === pin.target) : undefined;
       if (app) usedKeys.add(app.key);
       out.push({ kind: "app", id: `pin:${pin.path}`, name: pin.name, path: pin.path, key: pin.target, pin, app });
@@ -114,7 +133,7 @@ export default function Dock() {
       out.push({ kind: "tray", id: "tray" });
     }
     return out;
-  }, [dock, look, running, dragOrder, vertical]);
+  }, [dock, look, running, dragOrder, vertical, config?.ai.dockSection, config?.ai.apps]);
 
   // Clock ticks only when visible.
   const hasClock = items.some((i) => i.kind === "clock" || i.kind === "tray");
@@ -464,6 +483,10 @@ export default function Dock() {
               animate={vertical ? { y: shift } : { x: shift }}
               transition={{ type: "spring", stiffness: 500, damping: 30 }}
             >
+              {it.kind === "app" && it.ai && (
+                <m.span aria-hidden className={`dock-ai-ring ${aiBusy ? "busy" : ""}`} style={{ inset: -size * 0.08, borderRadius: Math.min(radius * 0.6 + 8, size * 0.36) }}
+                  initial={false} animate={{ scale: sc }} transition={{ type: "spring", stiffness: 500, damping: 30 }} />
+              )}
               <m.button
                 type="button"
                 aria-label={it.kind === "start" ? "Start" : it.kind === "search" ? "Search" : it.name}

@@ -63,3 +63,4 @@ button:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .music-rain, .music-sheen, .music-orbit-dot { animation: none; }
 }
+

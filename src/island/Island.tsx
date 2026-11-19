@@ -12,6 +12,8 @@
 // it is click-through.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { getTasks, onNotify, onTasks, type AiNotification, type AiTask } from "../lib/ai";
+import { aiLook, COMPLETED_MS, noteLook, pickTask } from "./ai/AiViews";
 import { AnimatePresence, LazyMotion, domAnimation, m } from "framer-motion";
 import { getConfig, onConfigChanged, type Config } from "../lib/config";
 import {
@@ -63,6 +65,8 @@ interface Timer {
 
 /** Which activity the island is showing right now. */
 type Current =
+  | { kind: "ai"; task: AiTask }
+  | { kind: "aiNote"; note: AiNotification }
   | { kind: "transient"; t: Transient }
   | { kind: "timer"; timer: Timer }
   | { kind: "music"; media: Media }
@@ -80,12 +84,21 @@ export default function Island() {
   const lastPlaying = useRef(0);
   const nextId = useRef(1);
   const cfgRef = useRef<Config | null>(null);
+  const [aiTasks, setAiTasks] = useState<AiTask[]>([]);
+  const [aiNotes, setAiNotes] = useState<AiNotification[]>([]);
+  const [aiTick, setAiTick] = useState(0);
 
   // ---- Data subscriptions ------------------------------------------------
   useEffect(() => {
     getConfig().then((c) => ((cfgRef.current = c), setConfig(c)));
     getSnapshot().then(setSys).catch(() => {});
+    getTasks().then(setAiTasks).catch(() => {});
     const subs = [
+      onTasks(setAiTasks),
+      onNotify((n) => {
+        setAiNotes((q) => [...q.slice(-4), n]);
+        if (cfgRef.current?.ai.sound) chime();
+      }),
       onConfigChanged((c) => ((cfgRef.current = c), setConfig(c))),
       onState(setSys),
       onHover(setHovered),
@@ -114,6 +127,22 @@ export default function Island() {
     const t = window.setTimeout(() => setQueue((q) => q.slice(1)), TRANSIENT_MS);
     return () => window.clearTimeout(t);
   }, [queue]);
+
+  // AI notifications stay a little longer than system ones (there's text to read).
+  useEffect(() => {
+    if (!aiNotes.length || queue.length) return;
+    const t = window.setTimeout(() => setAiNotes((q) => q.slice(1)), 7000);
+    return () => window.clearTimeout(t);
+  }, [aiNotes, queue.length]);
+
+  // A completed task shows for COMPLETED_MS; wake up when it should go.
+  useEffect(() => {
+    const ends = aiTasks.filter((t) => t.status === "completed").map((t) => t.updated + COMPLETED_MS - Date.now()).filter((d) => d > 0);
+    if (!ends.length) return;
+    const t = window.setTimeout(() => setAiTick((x) => x + 1), Math.min(...ends) + 50);
+    return () => window.clearTimeout(t);
+  }, [aiTasks, aiTick]);
+  const aiTask = useMemo(() => pickTask(aiTasks, Date.now()), [aiTasks, aiTick]);
 
   // Tick only while something time-based is on screen (keeps idle CPU ~0).
   const media = sys.media;
@@ -161,14 +190,18 @@ export default function Island() {
   // ---- What to show ------------------------------------------------------
   const act = config?.island.activities;
   const current: Current = useMemo(() => {
+    if (aiTask?.status === "permission") return { kind: "ai", task: aiTask };
     if (queue[0]) return { kind: "transient", t: queue[0] };
+    if (aiNotes[0]) return { kind: "aiNote", note: aiNotes[0] };
+    if (aiTask) return { kind: "ai", task: aiTask };
     if (timer && act?.timer) return { kind: "timer", timer };
     if (media && act?.music && (media.playing || musicLingering)) return { kind: "music", media };
     const b = sys.battery;
     if (b && act?.battery && !b.charging && b.percent <= 20) return { kind: "batteryLow", percent: b.percent };
     return { kind: "idle" };
-  }, [queue, timer, media, musicLingering, sys.battery, act]);
+  }, [aiTask, queue, aiNotes, timer, media, musicLingering, sys.battery, act]);
 
+  const isAi = (current.kind === "ai" || current.kind === "aiNote") && pinned !== "actions";
   const mode: Mode = pinned
     ? pinned
     : hovered || current.kind === "transient"
@@ -183,9 +216,16 @@ export default function Island() {
   const baseLook = design.look("#000");
   const offsetY = baseLook.notch ? 0 : config?.island.offsetY ?? 8;
   const isMusic = current.kind === "music" && mode !== "actions" && mode !== "idle";
-  const shape = (isMusic && MUSIC_SHAPES[mode]) || SHAPES[mode];
+  const aiCard = !config || !isAi
+    ? null
+    : current.kind === "ai"
+      ? aiLook(config.ai.style, current.task, config.ai.apps, s)
+      : current.kind === "aiNote"
+        ? noteLook(current.note, config.ai.apps, config.appearance.accent, s, () => setAiNotes((q) => q.slice(1)))
+        : null;
+  const shape = aiCard ?? ((isMusic && MUSIC_SHAPES[mode]) || SHAPES[mode]);
   const w = shape.w * s;
-  const h = shape.h * s * (mode === "idle" || mode === "compact" ? baseLook.heightScale ?? 1 : 1);
+  const h = shape.h * s * (!aiCard && (mode === "idle" || mode === "compact") ? baseLook.heightScale ?? 1 : 1);
   useEffect(() => {
     setHitRect({ x: (window.innerWidth - w) / 2, y: offsetY, w, h }).catch(() => {});
   }, [w, h, offsetY]);
@@ -202,7 +242,7 @@ export default function Island() {
   };
   const onPointerUp = () => {
     window.clearTimeout(pressTimer.current);
-    if (!longPressed.current) setPinned((p) => (p ? null : "details"));
+    if (!longPressed.current) setPinned((p) => (p ? null : aiCard ? null : "details"));
   };
 
   const startTimer = (minutes: number) => {
@@ -218,8 +258,11 @@ export default function Island() {
   const themeChoice = findTheme(config.island.musicTheme);
   const mTheme = themeChoice ?? autoTheme(config.appearance.accent, look.fg, look.muted);
   const themed = isMusic && !!themeChoice;
-  const surface = themed ? shellStyle(mTheme) : { ...look.surface, ...designVars(look) };
-  const shadow = themed ? mTheme.glow : glowing ? look.glow(config.appearance.accent) : look.shadow;
+  const surface = aiCard
+    ? aiCard.bare ? { background: "transparent" } : aiCard.surface
+    : themed ? shellStyle(mTheme) : { ...look.surface, ...designVars(look) };
+  const shadow = aiCard ? (aiCard.bare ? "none" : aiCard.shadow) : themed ? mTheme.glow : glowing ? look.glow(config.appearance.accent) : look.shadow;
+  const notch = look.notch && !aiCard;
 
   return (
     <LazyMotion features={domAnimation} strict>
@@ -229,14 +272,14 @@ export default function Island() {
         <m.div
           role="status"
           aria-live="polite"
-          className={`pointer-events-auto relative cursor-default overflow-hidden select-none ${themed || mode === "idle" || mode === "compact" ? "" : look.className ?? ""}`}
+          className={`pointer-events-auto relative cursor-default select-none ${aiCard?.bare ? "overflow-visible" : "overflow-hidden"} ${aiCard || themed || mode === "idle" || mode === "compact" ? "" : look.className ?? ""}`}
           style={{ ...surface, fontSize: 13 * s }}
           initial={false}
           animate={{
             width: w,
             height: h,
-            borderTopLeftRadius: look.notch ? 0 : shape.r * s,
-            borderTopRightRadius: look.notch ? 0 : shape.r * s,
+            borderTopLeftRadius: notch ? 0 : shape.r * s,
+            borderTopRightRadius: notch ? 0 : shape.r * s,
             borderBottomLeftRadius: shape.r * s,
             borderBottomRightRadius: shape.r * s,
             opacity: hidden ? 0 : 1,
@@ -250,15 +293,17 @@ export default function Island() {
           {themed && mode !== "compact" && <Decoration theme={mTheme} s={s} />}
           <AnimatePresence mode="popLayout" initial={false}>
             <m.div
-              key={`${mode}:${current.kind}:${current.kind === "transient" ? current.t.id : ""}`}
+              key={`${mode}:${current.kind}:${current.kind === "transient" ? current.t.id : current.kind === "aiNote" ? current.note.id : current.kind === "ai" ? current.task.id + current.task.status : ""}`}
               className="absolute inset-0 flex items-center"
-              style={{ padding: `0 ${(isMusic ? 16 : 14) * s}px` }}
+              style={{ padding: aiCard?.bare ? 0 : `0 ${(isMusic ? 16 : aiCard ? 18 : 14) * s}px` }}
               initial={{ opacity: 0, scale: 0.92, filter: "blur(6px)" }}
               animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
               exit={{ opacity: 0, scale: 0.96, filter: "blur(6px)", transition: { duration: 0.12 } }}
               transition={{ ...SPRING, delay: 0.05 }}
             >
-              {mode === "actions" ? (
+              {aiCard ? (
+                aiCard.content
+              ) : mode === "actions" ? (
                 <QuickActions s={s} accent={config.appearance.accent} media={media} onTimer={startTimer} />
               ) : isMusic && current.kind === "music" ? (
                 mode === "compact" ? (

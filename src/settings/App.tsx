@@ -5,6 +5,7 @@ import { getConfig, onConfigChanged, setConfig, type Config } from "../lib/confi
 import { applyTheme } from "../lib/theme";
 import { DockSection } from "./dock";
 import { ConverterSection } from "./converter";
+import { AiSection } from "./ai";
 import { AboutSection, AppearanceSection, ComingSoon, GeneralSection, IslandSection, type SectionProps } from "./sections";
 
 type SectionId = "general" | "appearance" | "dock" | "island" | "convert" | "desktop" | "ai" | "about";
@@ -16,7 +17,7 @@ const SECTIONS: { id: SectionId; label: string; icon: string; render: (p: Sectio
   { id: "dock", label: "Dock", icon: "▭", render: (p) => <DockSection {...p} /> },
   { id: "convert", label: "Converter", icon: "◎", render: (p) => <ConverterSection {...p} /> },
   { id: "desktop", label: "Desktop", icon: "▦", render: () => <ComingSoon step={5} what="Fences, sorting rules and one-click clean with undo." /> },
-  { id: "ai", label: "AI Apps", icon: "✦", render: () => <ComingSoon step={6} what="AI spotlight in the dock and styled AI notifications." /> },
+  { id: "ai", label: "AI Apps", icon: "✦", render: (p) => <AiSection {...p} /> },
   { id: "about", label: "About", icon: "ⓘ", render: () => <AboutSection /> },
 ];
 

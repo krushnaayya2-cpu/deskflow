@@ -13,7 +13,7 @@ Built with **Tauri 2** (Rust + React/TypeScript + Tailwind). No Electron, no tel
 | 2 | Glass dock and theme system | ✅ Done |
 | 4 | Hover-to-convert circle menu and conversion engine | ✅ Done |
 | 5 | Desktop organizer | Planned |
-| 6 | AI spotlight and notifications | Planned |
+| 6 | AI spotlight and notifications | Done |
 | 7 | Performance pass and installer polish | Planned |
 
 ## Using it (step 1)
@@ -53,7 +53,20 @@ A pill at the top-centre of the screen (click-through when you're not touching i
 - Live activities: music from any media app (with previous/play-pause/next), timers, charger plugged in/out and low battery, Wi-Fi/network changes, and finished downloads (with Open and Show in folder).
 - Settings → *Dynamic Island*: on/off, size, glass or solid, main display or all displays, distance from top, hide when idle, which activities to show, and a **Show sample** preview button.
 - **Music player styles** (Settings → Dynamic Island): 16 themes — Spectrum, Cosmic Dust, Pixel Pulse, Aurora Flow, Liquid Chrome, Neon Orbit, Emerald Rain, Mono Wave, Holographic, Ice Glass, Solar Flare, Abyss Blue, Blood Moon, Dark Plasma, Phantom Green, Void Pulse — or match the island design. Each has a compact pill, a hover player bar and a full player (click) with album art, an audio-reactive visualizer, progress/seek, shuffle, repeat and system volume.
-- Bluetooth changes, file-conversion progress and AI notifications are added with later steps.
+- Bluetooth changes are added in a later step.
+
+## AI apps
+
+Settings → AI Apps. AI tasks and notifications appear in the Dynamic Island in one of eight styles (Ticker, Split capsule, Paper glass, Shutters, Sidecar, Task map, Result ticket, Lifecycle). A task moves through **Running → Permission needed (Deny / Allow once) → Completed (View result) / Needs attention (Review)**. Press **Preview on island** to see it.
+
+- **Claude Code:** copy the hooks from Settings → AI Apps into `%USERPROFILE%\.claude\settings.json`. Claude Code's work then shows on the island, and you can answer its permission requests from there.
+- **Any app:** a local API on `127.0.0.1:47821` (this PC only). Each request needs the token from Settings in an `X-DeskFlow-Token` header.
+  - `POST /v1/notify` `{app, title, body, url}`: a notification card.
+  - `POST /v1/tasks` `{id?, app, tag, title, detail, status, step, steps, stepLabels, result}` → `{id}`: create or update a task (`status` is `running`, `permission`, `completed` or `attention`).
+  - `GET /v1/tasks/{id}/decision?timeout=60` → `{decision: "allow" | "deny" | null}`: wait for the user's answer.
+  - `DELETE /v1/tasks/{id}`.
+- **Dock:** AI apps found on your PC get their own section with a gradient ring that spins while a task runs.
+- Do not disturb, sound, and a history of recent notifications and tasks.
 
 ## Settings file
 

@@ -20,3 +20,22 @@ button:focus-visible {
   outline-offset: 3px;
   border-radius: 12px;
 }
+
+/* AI section: a soft rotating gradient ring around AI apps. */
+@property --ai-angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+.dock-ai-ring {
+  position: absolute;
+  pointer-events: none;
+  padding: 2px;
+  background: conic-gradient(from var(--ai-angle), #a855f7, #22d3ee, #f472b6, #f59e0b, #a855f7);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.75;
+  filter: drop-shadow(0 0 4px rgba(168, 85, 247, 0.6));
+  transform-origin: 50% 100%;
+}
+/* Idle ring is static (no repaints); it spins only while an AI task runs. */
+.dock-ai-ring.busy { opacity: 1; animation: ai-ring 1.6s linear infinite; filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.9)); }
+@keyframes ai-ring { to { --ai-angle: 360deg; } }
+@media (prefers-reduced-motion: reduce) { .dock-ai-ring { animation: none; } }

@@ -370,6 +370,43 @@ impl Default for ConverterConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
+pub struct AiConfig {
+    /// Run the local API that AI apps use to send tasks and notifications.
+    pub api_enabled: bool,
+    pub api_port: u16,
+    /// Secret apps must send (header X-DeskFlow-Token). Generated on first run.
+    pub api_token: String,
+    /// Island style for AI tasks: ticker, split, paper, shutters, sidecar,
+    /// taskmap, ticket or lifecycle.
+    pub style: String,
+    /// Do Not Disturb: notifications go to history only (permission
+    /// requests still show, since a task is waiting).
+    pub dnd: bool,
+    pub sound: bool,
+    /// AI apps shown in the dock's AI section.
+    pub apps: Vec<PinnedApp>,
+    pub apps_scanned: bool,
+    pub dock_section: bool,
+}
+
+impl Default for AiConfig {
+    fn default() -> Self {
+        Self {
+            api_enabled: true,
+            api_port: 47821,
+            api_token: String::new(),
+            style: "ticker".into(),
+            dnd: false,
+            sound: true,
+            apps: Vec::new(),
+            apps_scanned: false,
+            dock_section: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
 pub struct Config {
     pub version: u32,
     pub general: GeneralConfig,
@@ -377,6 +414,7 @@ pub struct Config {
     pub island: IslandConfig,
     pub dock: DockConfig,
     pub converter: ConverterConfig,
+    pub ai: AiConfig,
 }
 
 impl Default for Config {
@@ -388,6 +426,7 @@ impl Default for Config {
             island: IslandConfig::default(),
             dock: DockConfig::default(),
             converter: ConverterConfig::default(),
+            ai: AiConfig::default(),
         }
     }
 }
@@ -402,6 +441,9 @@ impl Config {
         self.dock.style.validate()?;
         for t in &self.dock.themes {
             t.style.validate()?;
+        }
+        if self.ai.api_port < 1024 {
+            return Err("API port must be 1024 or higher".into());
         }
         if self.island.music_theme.len() > 40 {
             return Err("Unknown music theme".into());
