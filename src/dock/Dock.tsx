@@ -496,7 +496,7 @@ export default function Dock() {
                 ) : it.kind === "search" ? (
                   <SearchGlyph size={size * 0.5} fg={look.fg} label={look.split} />
                 ) : (
-                  <AppIcon path={it.path} hwnd={it.app?.windows[0]?.hwnd} name={it.name} size={size * (look.item ? 0.7 : 1)} accent={accent} iconStyle={style.iconStyle} />
+                  <AppIcon path={it.app?.path ?? (it.pin?.target || it.path)} hwnd={it.app?.windows[0]?.hwnd} name={it.name} size={size * (look.item ? 0.7 : 1)} accent={accent} iconStyle={style.iconStyle} />
                 )}
               </m.button>
               {it.kind === "app" && it.app && (

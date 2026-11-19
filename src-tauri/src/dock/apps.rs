@@ -126,11 +126,17 @@ pub fn taskbar_pins() -> Vec<PinnedApp> {
 /// Build a pinned entry from an .exe or .lnk path.
 pub fn pinned_from_path(path: &str) -> PinnedApp {
     let is_lnk = path.to_ascii_lowercase().ends_with(".lnk");
-    let (target, args) = if is_lnk {
+    let (mut target, args) = if is_lnk {
         platform::resolve_lnk(path).unwrap_or_default()
     } else {
         (path.to_string(), String::new())
     };
+    // The taskbar's "File Explorer" shortcut points at a shell folder, not an
+    // exe; match it to explorer.exe so it merges with open Explorer windows.
+    if target.is_empty() && file_stem(path).to_lowercase().contains("explorer") {
+        let windir = std::env::var("WINDIR").unwrap_or_else(|_| r"C:\Windows".into());
+        target = format!(r"{windir}\explorer.exe");
+    }
     let name = if is_lnk {
         file_stem(path).to_string()
     } else {
@@ -517,6 +523,13 @@ mod tests {
         assert_eq!(stem_name(r"C:\Windows\explorer.exe"), "File Explorer");
         assert_eq!(stem_name(r"C:\x\spotify.exe"), "Spotify");
         assert_eq!(stem_name(r"C:\x\Code.exe"), "Visual Studio Code");
+    }
+
+    #[test]
+    fn explorer_shortcut_maps_to_explorer_exe() {
+        let p = pinned_from_path(r"C:\Users\x\AppData\Roaming\Pinned\File Explorer.lnk");
+        assert!(p.target.ends_with("explorer.exe"), "{}", p.target);
+        assert_eq!(p.name, "File Explorer");
     }
 
     #[test]

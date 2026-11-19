@@ -54,6 +54,22 @@ pub fn init(app: &AppHandle, cfg: &Config) {
         c.dock.pins_imported = true;
         let _ = store.set(c);
     }
+    // Re-resolve pins saved without a target (e.g. older Explorer pins).
+    {
+        let store = app.state::<ConfigStore>();
+        let mut c = store.get();
+        let mut changed = false;
+        for p in c.dock.pinned.iter_mut().filter(|p| p.target.is_empty()) {
+            let fresh = apps::pinned_from_path(&p.path);
+            if !fresh.target.is_empty() {
+                p.target = fresh.target;
+                changed = true;
+            }
+        }
+        if changed {
+            let _ = store.set(c);
+        }
+    }
     sync(app, &app.state::<ConfigStore>().get());
 }
 
