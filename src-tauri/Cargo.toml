@@ -26,9 +26,12 @@ notify = "8"
 png = "0.18"
 base64 = "0.22"
 tauri-plugin-dialog = "2"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif", "bmp", "tiff"] }
+lopdf = "0.47"
 
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.39"
+winreg = "0.56"
 windows = { version = "0.62", features = [
   "Foundation",
   "Media",
@@ -44,6 +47,9 @@ windows = { version = "0.62", features = [
   "Win32_System_Com",
   "Win32_System_Diagnostics_ToolHelp",
   "Win32_System_ProcessStatus",
+  "Win32_System_Variant",
+  "Win32_System_Ole",
+  "Win32_UI_Shell_Common",
   "Win32_System_LibraryLoader",
   "Win32_System_Power",
   "Win32_System_Threading",

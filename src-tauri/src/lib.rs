@@ -6,6 +6,7 @@
 
 mod commands;
 mod config;
+mod convert;
 mod dock;
 mod hotkey;
 mod island;
@@ -25,8 +26,13 @@ pub fn run() {
     let started = std::time::Instant::now();
     let app = tauri::Builder::default()
         // Must be first: a second launch just focuses the running instance.
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            windows::show_settings(app);
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            // "Convert with DeskFlow" launches us with --convert <file>.
+            if args.iter().any(|a| a == "--convert") {
+                convert::handle_args(app, &args);
+            } else {
+                windows::show_settings(app);
+            }
         }))
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
@@ -41,6 +47,14 @@ pub fn run() {
             commands::get_app_info,
             commands::open_config_folder,
             perf::perf_stats,
+            convert::convert_pending,
+            convert::convert_expand,
+            convert::convert_start,
+            convert::convert_close,
+            convert::convert_open,
+            convert::convert_pick,
+            convert::convert_tools,
+            convert::convert_install,
             overlay::overlay_set_hit_rects,
             island::island_snapshot,
             island::island_demo,
@@ -84,12 +98,16 @@ pub fn run() {
             overlay::init(handle);
             island::init(handle, &cfg);
             dock::init(handle, &cfg);
+            convert::init(handle, &cfg);
+            let args: Vec<String> = std::env::args().collect();
+            convert::handle_args(handle, &args);
             perf::mark_started(started);
 
             // Show settings on the very first manual launch so the user sees
             // something; otherwise DeskFlow starts silently in the tray.
             let from_login = std::env::args().any(|a| a == AUTOSTART_FLAG);
-            if first_run && !from_login {
+            let from_convert = std::env::args().any(|a| a == "--convert");
+            if first_run && !from_login && !from_convert {
                 windows::show_settings(handle);
             }
             Ok(())

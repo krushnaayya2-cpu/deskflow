@@ -351,12 +351,32 @@ pub fn is_hex_color(a: &str) -> bool {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
+pub struct ConverterConfig {
+    /// Round convert button when hovering a file on the desktop / in Explorer.
+    pub hover_button: bool,
+    /// How long the mouse must rest on a file before the button appears.
+    pub hover_delay_ms: u32,
+    /// "Convert with DeskFlow" in the right-click menu.
+    pub context_menu: bool,
+    /// Floating circle at the screen edge to drop files on.
+    pub drop_zone: bool,
+}
+
+impl Default for ConverterConfig {
+    fn default() -> Self {
+        Self { hover_button: true, hover_delay_ms: 600, context_menu: true, drop_zone: false }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
 pub struct Config {
     pub version: u32,
     pub general: GeneralConfig,
     pub appearance: AppearanceConfig,
     pub island: IslandConfig,
     pub dock: DockConfig,
+    pub converter: ConverterConfig,
 }
 
 impl Default for Config {
@@ -367,6 +387,7 @@ impl Default for Config {
             appearance: AppearanceConfig::default(),
             island: IslandConfig::default(),
             dock: DockConfig::default(),
+            converter: ConverterConfig::default(),
         }
     }
 }

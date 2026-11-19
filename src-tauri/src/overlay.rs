@@ -11,7 +11,7 @@ use std::{collections::HashMap, sync::Mutex, thread, time::Duration};
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 
 /// Window label prefixes that get hover tracking.
-pub const PREFIXES: &[&str] = &["island-", "dock-"];
+pub const PREFIXES: &[&str] = &["island-", "dock-", "convert"];
 /// Sent to a window whenever the cursor enters or leaves its rectangles.
 pub const EV_HOVER: &str = "overlay://hover";
 

@@ -3,7 +3,7 @@
 
 use crate::{
     config::{Config, ConfigStore},
-    dock, hotkey, island, tray, windows,
+    convert, dock, hotkey, island, tray, windows,
 };
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -50,6 +50,9 @@ pub fn update_config(app: &AppHandle, mut new: Config) -> Result<Config, String>
     app.state::<ConfigStore>().set(new.clone())?;
     if new.island != old.island {
         island::sync(app, &new);
+    }
+    if new.converter != old.converter {
+        convert::sync(app, &new);
     }
     if new.dock != old.dock || new.appearance != old.appearance {
         dock::sync(app, &new);
