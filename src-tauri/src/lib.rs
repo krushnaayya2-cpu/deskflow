@@ -7,6 +7,7 @@
 mod ai;
 mod commands;
 mod config;
+mod diag;
 mod convert;
 mod dock;
 mod hotkey;
@@ -25,6 +26,7 @@ pub const AUTOSTART_FLAG: &str = "--autostart";
 
 pub fn run() {
     let started = std::time::Instant::now();
+    diag::init();
     let app = tauri::Builder::default()
         // Must be first: a second launch just focuses the running instance.
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
@@ -103,16 +105,23 @@ pub fn run() {
             if let Err(e) = hotkey::register(handle, &cfg.general.settings_hotkey) {
                 log::warn!("could not register settings hotkey: {e}");
             }
+            diag::trace("tray::create");
             tray::create(handle, &cfg)?;
             windows::apply_theme(handle, cfg.appearance.theme);
+            diag::trace("overlay::init");
             overlay::init(handle);
+            diag::trace("island::init");
             island::init(handle, &cfg);
+            diag::trace("dock::init");
             dock::init(handle, &cfg);
+            diag::trace("convert::init");
             convert::init(handle, &cfg);
+            diag::trace("ai::init");
             ai::init(handle, &cfg);
             let args: Vec<String> = std::env::args().collect();
             convert::handle_args(handle, &args);
             perf::mark_started(started);
+            diag::trace("started");
 
             // Show settings on the very first manual launch so the user sees
             // something; otherwise DeskFlow starts silently in the tray.
