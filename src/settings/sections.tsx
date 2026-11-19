@@ -1,6 +1,6 @@
 // The pages of the settings window.
 import { useEffect, useState } from "react";
-import { getAppInfo, openConfigFolder, type AppInfo, type Config, type IslandActivity, type IslandConfig } from "../lib/config";
+import { getAppInfo, getPerfStats, openConfigFolder, type AppInfo, type PerfStats, type Config, type IslandActivity, type IslandConfig } from "../lib/config";
 import { islandDemo } from "../lib/island";
 import { DESIGNS, designVars } from "../island/designs";
 import { MUSIC_THEMES, gradient, shellStyle } from "../island/music/themes";
@@ -87,11 +87,27 @@ export function ComingSoon({ step, what }: { step: number; what: string }) {
 
 export function AboutSection() {
   const [info, setInfo] = useState<AppInfo | null>(null);
+  const [perf, setPerf] = useState<PerfStats | null>(null);
   useEffect(() => {
     getAppInfo().then(setInfo).catch(() => {});
+    // Live usage while this page is open (the first CPU sample is a baseline).
+    const tick = () => getPerfStats().then(setPerf).catch(() => {});
+    tick();
+    const iv = window.setInterval(tick, 2000);
+    return () => window.clearInterval(iv);
   }, []);
+  const mono = "font-mono text-[13px] text-muted tabular-nums";
   return (
     <div className="space-y-2.5">
+      <Row label="Memory" description={`All DeskFlow processes (${perf?.processes ?? "…"}), including its WebView2 helpers.`}>
+        <span className={mono}>{perf ? `${perf.memoryMb.toFixed(0)} MB` : "…"}</span>
+      </Row>
+      <Row label="CPU" description="Average over the last 2 seconds, share of the whole PC.">
+        <span className={mono}>{perf ? `${perf.cpuPercent.toFixed(1)} %` : "…"}</span>
+      </Row>
+      <Row label="Startup time" description="From launch until the tray, island and dock were ready.">
+        <span className={mono}>{perf ? `${perf.startupSecs.toFixed(2)} s` : "…"}</span>
+      </Row>
       <Row label="Version" description="DeskFlow runs fully offline and sends no telemetry.">
         <span className="font-mono text-[13px] text-muted">{info?.version ?? "…"}</span>
       </Row>

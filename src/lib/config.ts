@@ -97,3 +97,12 @@ export const openConfigFolder = () => invoke<void>("open_config_folder");
 /** Fires whenever any window (or the tray menu) changes settings. */
 export const onConfigChanged = (cb: (c: Config) => void): Promise<UnlistenFn> =>
   listen<Config>("config-changed", (e) => cb(e.payload));
+
+export interface PerfStats {
+  memoryMb: number;
+  privateMb: number;
+  cpuPercent: number;
+  processes: number;
+  startupSecs: number;
+}
+export const getPerfStats = () => invoke<PerfStats>("perf_stats");

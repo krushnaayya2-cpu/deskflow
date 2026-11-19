@@ -10,6 +10,7 @@ mod dock;
 mod hotkey;
 mod island;
 mod overlay;
+mod perf;
 mod tray;
 mod windows;
 
@@ -21,6 +22,7 @@ use tauri::{Manager, RunEvent, WindowEvent};
 pub const AUTOSTART_FLAG: &str = "--autostart";
 
 pub fn run() {
+    let started = std::time::Instant::now();
     let app = tauri::Builder::default()
         // Must be first: a second launch just focuses the running instance.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
@@ -38,6 +40,7 @@ pub fn run() {
             commands::set_config,
             commands::get_app_info,
             commands::open_config_folder,
+            perf::perf_stats,
             overlay::overlay_set_hit_rects,
             island::island_snapshot,
             island::island_demo,
@@ -62,7 +65,7 @@ pub fn run() {
             dock::dock_export_theme,
             dock::dock_import_theme,
         ])
-        .setup(|app| {
+        .setup(move |app| {
             let handle = app.handle();
             let dir = app.path().app_config_dir()?;
             let (store, first_run) = ConfigStore::load(&dir);
@@ -81,6 +84,7 @@ pub fn run() {
             overlay::init(handle);
             island::init(handle, &cfg);
             dock::init(handle, &cfg);
+            perf::mark_started(started);
 
             // Show settings on the very first manual launch so the user sees
             // something; otherwise DeskFlow starts silently in the tray.
