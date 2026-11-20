@@ -86,6 +86,7 @@ pub fn rebuild(app: &AppHandle) {
 
 /// Make windows and the taskbar match the config.
 pub fn sync(app: &AppHandle, cfg: &Config) {
+    crate::diag::trace(&format!("dock sync: enabled={} hide_taskbar={}", cfg.dock.enabled, cfg.dock.hide_taskbar));
     apply_taskbar(app, cfg);
     let state = app.state::<DockState>();
     let mut layout = state.layout.lock().unwrap();
@@ -152,6 +153,7 @@ fn reserve_space(app: &AppHandle, cfg: &Config) {
             DockPosition::Right => taskbar::Edge::Right,
         };
         let thickness = ((d.style.icon_size as f64 + 34.0) * m.scale_factor()) as i32;
+        crate::diag::trace(&format!("dock {} reserves {thickness}px ({:?})", w.label(), d.style.position));
         taskbar::reserve(hwnd, edge, (mp.x, mp.y, mp.x + ms.width as i32, mp.y + ms.height as i32), thickness);
     }
 }
@@ -202,6 +204,7 @@ fn create(app: &AppHandle, gen: u32, i: usize, m: &tauri::Monitor, pos: DockPosi
         .build()?;
     win.set_size(PhysicalSize::new(w, h))?;
     win.set_position(PhysicalPosition::new(x, y))?;
+    crate::diag::trace(&format!("dock {label}: {w}x{h} at {x},{y} (full_screen={full_screen})"));
     overlay::make_no_activate(&win);
     win.show()?;
     win.set_ignore_cursor_events(true)?;
