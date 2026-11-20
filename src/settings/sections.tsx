@@ -237,9 +237,12 @@ function DesignPicker(props: { value: IslandDesign; accent: string; onChange: (d
                 style={{ background: "linear-gradient(135deg,#3b1d4a,#0f172a 60%,#1e3a5f)", paddingTop: look.notch ? 0 : 10 }}
               >
                 <div
-                  className={`flex h-7 w-32 items-center gap-2 px-3 text-[10px] font-semibold ${look.className ?? ""}`}
+                  className={`flex h-7 w-32 items-center gap-2 px-3 text-[10px] font-semibold ${look.className ?? ""} ${look.surfaceClass ?? ""}`}
                   style={{
                     ...look.surface,
+                    // The real island gets native acrylic; in this preview the
+                    // gradient behind is page content, so CSS blur shows it.
+                    ...(look.nativeGlass ? { backdropFilter: "blur(10px) saturate(180%)" } : {}),
                     ...designVars(look),
                     borderRadius: look.notch ? "0 0 14px 14px" : 14,
                     boxShadow: look.shadow,

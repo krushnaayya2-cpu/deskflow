@@ -37,6 +37,11 @@ export type IslandEvent =
   | { kind: "network"; connected: boolean; name: string; wifi: boolean }
   | { kind: "notify"; title: string; body: string; path: string | null };
 
+/** Place the native acrylic glass behind the pill (null hides it). */
+export const setIslandGlass = (rect: { x: number; y: number; w: number; h: number } | null, radius: number) =>
+  invoke("island_set_glass", { rect, radius });
+/** Native acrylic available (Windows 10 1803+)? */
+export const glassSupported = () => invoke<boolean>("glass_supported");
 export const getSnapshot = () => invoke<SystemState>("island_snapshot");
 export const setHitRect = (rect: { x: number; y: number; w: number; h: number }) =>
   invoke("overlay_set_hit_rects", { rects: [rect] });

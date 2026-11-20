@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { diag } from "../lib/diag";
 import { getTasks, onNotify, onTasks, type AiNotification, type AiTask } from "../lib/ai";
 import { aiLook, COMPLETED_MS, noteLook, pickTask } from "./ai/AiViews";
-import { AnimatePresence, LazyMotion, domAnimation, m } from "framer-motion";
+import { AnimatePresence, LazyMotion, domAnimation, m, type TargetAndTransition } from "framer-motion";
 import { getConfig, onConfigChanged, type Config } from "../lib/config";
 import {
   getSnapshot,
@@ -28,6 +28,8 @@ import {
   openSettings,
   revealPath,
   setHitRect,
+  setIslandGlass,
+  glassSupported,
   type IslandEvent,
   type Media,
   type SystemState,
@@ -56,6 +58,20 @@ const TRANSIENT_MS = 4500;
 const LONG_PRESS_MS = 500;
 const MUSIC_LINGER_MS = 60_000; // keep a paused song visible for a minute
 const SPRING = { type: "spring", stiffness: 420, damping: 32, mass: 0.9 } as const;
+/** Shape morph: width, height and corner radius move together on one
+ *  spring-like curve (same values as --lg-ease / --lg-duration in
+ *  src/styles/glass.css), so the island never looks stretched mid-change. */
+const MORPH = { duration: 0.4, ease: [0.32, 0.72, 0, 1] } as const;
+/** Gentle bounce when the pointer arrives. Transform only (60fps). */
+const BOUNCE: TargetAndTransition = { scale: [1, 1.035, 0.995, 1], transition: { duration: 0.45, ease: "easeOut" } };
+
+/** Text width in px for the island's font, for sizing pills to content. */
+const measureCtx = typeof document !== "undefined" ? document.createElement("canvas").getContext("2d") : null;
+function textWidth(text: string, px: number, weight = 600) {
+  if (!measureCtx || !text) return 0;
+  measureCtx.font = `${weight} ${px}px "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif`;
+  return measureCtx.measureText(text).width;
+}
 
 type Transient = (IslandEvent | { kind: "timerDone" }) & { id: number };
 interface Timer {
@@ -87,6 +103,11 @@ export default function Island() {
   const [aiTasks, setAiTasks] = useState<AiTask[]>([]);
   const [aiNotes, setAiNotes] = useState<AiNotification[]>([]);
   const [aiTick, setAiTick] = useState(0);
+  // Window width: the native window is resized when the Size setting or the
+  // display changes, and the hit area must be re-centred with it.
+  const [vw, setVw] = useState(window.innerWidth);
+  const [nativeGlassOk, setNativeGlassOk] = useState(false);
+  const pillRef = useRef<HTMLDivElement>(null);
 
   // ---- Data subscriptions ------------------------------------------------
   useEffect(() => {
@@ -98,6 +119,14 @@ export default function Island() {
       })
       .catch((e) => diag(`get_config failed: ${e}`));
     getSnapshot().then(setSys).catch(() => {});
+    glassSupported()
+      .then((ok) => {
+        setNativeGlassOk(ok);
+        document.documentElement.dataset.glass = ok ? "native" : "none";
+      })
+      .catch(() => (document.documentElement.dataset.glass = "none"));
+    const onResize = () => setVw(window.innerWidth);
+    window.addEventListener("resize", onResize);
     getTasks().then(setAiTasks).catch((e) => diag(`ai_tasks failed: ${e}`));
     diag(`island page loaded ${window.innerWidth}x${window.innerHeight}`);
     const subs = [
@@ -120,7 +149,10 @@ export default function Island() {
         if (allowed) pushTransient(e);
       }),
     ];
-    return () => subs.forEach((p) => p.then((f) => f()));
+    return () => {
+      window.removeEventListener("resize", onResize);
+      subs.forEach((p) => p.then((f) => f()));
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -231,11 +263,23 @@ export default function Island() {
         ? noteLook(current.note, config.ai.apps, config.appearance.accent, s, () => setAiNotes((q) => q.slice(1)))
         : null;
   const shape = aiCard ?? ((isMusic && MUSIC_SHAPES[mode]) || SHAPES[mode]);
-  const w = shape.w * s;
-  const h = shape.h * s * (!aiCard && (mode === "idle" || mode === "compact") ? baseLook.heightScale ?? 1 : 1);
+  // Size to content: notifications grow to fit their text (up to 1.45x the
+  // base width) instead of truncating inside a fixed pill.
+  const fitW = (() => {
+    if (aiCard || current.kind !== "transient" || mode !== "medium") return shape.w * s;
+    const t = current.t;
+    const title = t.kind === "download" ? "Download complete" : t.kind === "notify" ? t.title : t.kind === "network" ? (t.connected ? "Connected" : "Disconnected") : "";
+    const sub = t.kind === "download" ? t.name : t.kind === "notify" ? t.body : t.kind === "network" ? t.name : "";
+    const text = Math.max(textWidth(title, 13 * s, 600), textWidth(sub, 12 * s, 400));
+    const right = (t.kind === "download" && t.path) || (t.kind === "notify" && t.path) ? 120 * s : 0;
+    const want = 28 * s + 34 * s + 10 * s + text + right + 12 * s;
+    return Math.min(Math.max(shape.w * s, want), shape.w * s * 1.45);
+  })();
+  const w = Math.round(fitW);
+  const h = Math.round(shape.h * s * (!aiCard && (mode === "idle" || mode === "compact") ? baseLook.heightScale ?? 1 : 1));
   useEffect(() => {
-    setHitRect({ x: (window.innerWidth - w) / 2, y: offsetY, w, h }).catch(() => {});
-  }, [w, h, offsetY]);
+    setHitRect({ x: (vw - w) / 2, y: offsetY, w, h }).catch(() => {});
+  }, [w, h, offsetY, vw]);
 
   // ---- Click vs long-press -----------------------------------------------
   const pressTimer = useRef<number | undefined>(undefined);
@@ -258,6 +302,32 @@ export default function Island() {
     setPinned(null);
   };
 
+  // ---- Native glass behind the pill ---------------------------------------
+  // Reported every animation frame while the pill morphs (onUpdate), when a
+  // morph ends, and whenever glass is switched on/off or the window moves.
+  const glassRaf = useRef(0);
+  const glassInfo = useRef({ want: false, y: 0, key: "" });
+  const lastGlassKey = useRef("");
+  const reportGlass = useCallback((gw: number, gh: number, gr: number) => {
+    cancelAnimationFrame(glassRaf.current);
+    glassRaf.current = requestAnimationFrame(() => {
+      if (!glassInfo.current.want) return;
+      setIslandGlass({ x: (window.innerWidth - gw) / 2, y: glassInfo.current.y, w: gw, h: gh }, gr).catch(() => {});
+    });
+  }, []);
+  useEffect(() => {
+    const g = glassInfo.current;
+    if (g.key === lastGlassKey.current) return;
+    lastGlassKey.current = g.key;
+    if (!g.want) {
+      cancelAnimationFrame(glassRaf.current);
+      setIslandGlass(null, 0).catch(() => {});
+      return;
+    }
+    const el = pillRef.current;
+    if (el) reportGlass(el.offsetWidth, el.offsetHeight, Math.min(el.offsetHeight / 2, Number.parseFloat(getComputedStyle(el).getPropertyValue("--isl-rb")) || el.offsetHeight / 2));
+  });
+
   if (!config) return null;
   const look = (DESIGNS[config.island.style] ?? DESIGNS.glass).look(config.appearance.accent);
   const hidden = mode === "idle" && config.island.hideWhenIdle && !hovered;
@@ -270,43 +340,74 @@ export default function Island() {
     : themed ? shellStyle(mTheme) : { ...look.surface, ...designVars(look) };
   const shadow = aiCard ? (aiCard.bare ? "none" : aiCard.shadow) : themed ? mTheme.glow : glowing ? look.glow(config.appearance.accent) : look.shadow;
   const notch = look.notch && !aiCard;
+  // Island is always a pill: corner radius = height / 2 (the notch design
+  // keeps square top corners).
+  const rBottom = aiCard ? shape.r * s : h <= 110 * s ? h / 2 : shape.r * s;
+  const rTop = notch ? 0 : rBottom;
+  const liquid = !aiCard && !themed && !!look.surfaceClass;
+  const wantsGlass = nativeGlassOk && !!look.nativeGlass && !aiCard && !themed && !hidden;
+  glassInfo.current = { want: wantsGlass, y: offsetY, key: `${wantsGlass}:${vw}:${offsetY}` };
 
   return (
     <LazyMotion features={domAnimation} strict>
       <div className="pointer-events-none fixed inset-0 flex justify-center" style={{ paddingTop: offsetY }}>
         <div className="relative h-fit">
         {themed && mTheme.deco === "orbit" && mode !== "compact" && <OrbitRing theme={mTheme} w={w} h={h} />}
+        {/* Bounce wrapper: transform only, so it never fights the morph. */}
+        <m.div animate={hovered && !hidden ? BOUNCE : { scale: 1 }} whileTap={{ scale: 0.97 }} style={{ willChange: "transform" }}>
+        {/* Fix (island morph + corners): the outer element animates width,
+            height and the two corner radii together on one curve and carries
+            the shadow; the inner surface fills it exactly and is clipped with
+            clip-path using the same animated radii, so no square corner or
+            child layer (canvas, glow) can leak outside the pill. */}
         <m.div
+          ref={pillRef}
           role="status"
           aria-live="polite"
-          className={`pointer-events-auto relative cursor-default select-none ${aiCard?.bare ? "overflow-visible" : "overflow-hidden"} ${aiCard || themed || mode === "idle" || mode === "compact" ? "" : look.className ?? ""}`}
-          style={{ ...surface, fontSize: 13 * s }}
+          className="pointer-events-auto relative cursor-default select-none"
+          style={{ fontSize: 13 * s, borderRadius: "var(--isl-rt) var(--isl-rt) var(--isl-rb) var(--isl-rb)" } as React.CSSProperties}
           initial={false}
           animate={{
             width: w,
             height: h,
-            borderTopLeftRadius: notch ? 0 : shape.r * s,
-            borderTopRightRadius: notch ? 0 : shape.r * s,
-            borderBottomLeftRadius: shape.r * s,
-            borderBottomRightRadius: shape.r * s,
+            "--isl-rt": `${rTop}px`,
+            "--isl-rb": `${rBottom}px`,
             opacity: hidden ? 0 : 1,
             boxShadow: shadow,
+          } as never}
+          transition={{ ...MORPH, opacity: { duration: 0.25 } }}
+          onUpdate={(v) => {
+            if (!wantsGlass) return;
+            const vw2 = Number.parseFloat(String(v.width ?? w));
+            const vh2 = Number.parseFloat(String(v.height ?? h));
+            reportGlass(vw2, vh2, Number.parseFloat(String(v["--isl-rb"] ?? rBottom)));
           }}
-          transition={SPRING}
+          onAnimationComplete={() => wantsGlass && reportGlass(w, h, rBottom)}
           onPointerDown={onPointerDown}
           onPointerUp={onPointerUp}
           onPointerLeave={() => window.clearTimeout(pressTimer.current)}
         >
+          <div
+            className={`absolute inset-0 ${liquid ? look.surfaceClass : ""} ${aiCard || themed || mode === "idle" || mode === "compact" ? "" : look.className ?? ""}`}
+            style={{
+              ...surface,
+              borderRadius: "inherit",
+              overflow: aiCard?.bare ? "visible" : "hidden",
+              clipPath: aiCard?.bare ? undefined : "inset(0 round var(--isl-rt) var(--isl-rt) var(--isl-rb) var(--isl-rb))",
+            }}
+          >
           {themed && mode !== "compact" && <Decoration theme={mTheme} s={s} />}
           <AnimatePresence mode="popLayout" initial={false}>
             <m.div
               key={`${mode}:${current.kind}:${current.kind === "transient" ? current.t.id : current.kind === "aiNote" ? current.note.id : current.kind === "ai" ? current.task.id + current.task.status : ""}`}
               className="absolute inset-0 flex items-center"
               style={{ padding: aiCard?.bare ? 0 : `0 ${(isMusic ? 16 : aiCard ? 18 : 14) * s}px` }}
-              initial={{ opacity: 0, scale: 0.92, filter: "blur(6px)" }}
-              animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-              exit={{ opacity: 0, scale: 0.96, filter: "blur(6px)", transition: { duration: 0.12 } }}
-              transition={{ ...SPRING, delay: 0.05 }}
+              // Cross-fade with opacity + scale only (no filter: blur, which
+              // repaints every frame and dropped frames during the morph).
+              initial={{ opacity: 0, scale: 0.94 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.12 } }}
+              transition={{ ...SPRING, delay: 0.06 }}
             >
               {aiCard ? (
                 aiCard.content
@@ -328,6 +429,8 @@ export default function Island() {
               )}
             </m.div>
           </AnimatePresence>
+          </div>
+        </m.div>
         </m.div>
         </div>
       </div>

@@ -10,6 +10,8 @@ export interface DockLook {
   align: "center" | "start";
   /** Bar surface. Empty for designs without a bar (Pills). */
   bar: CSSProperties;
+  /** Class names on the bar (Liquid Glass layers from glass.css). */
+  barClass?: string;
   /** Surface behind each icon (Pills, Pebble, Tiles). Gets the item id. */
   item?: CSSProperties | ((id: string) => CSSProperties);
   /** Attached to the screen edge: only the top corners are rounded. */
@@ -51,7 +53,22 @@ const hash = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) |
 export function dockLook(design: DockDesign, s: DockStyle, accent: string, dark: boolean): DockLook {
   const fg = dark ? "#f4f4f8" : "#16161d";
   const border = dark ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.1)";
+  // No design uses CSS backdrop-filter: from a transparent window it can't
+  // see the desktop and it left square corners behind rounded shapes. Real
+  // blur comes from the native acrylic window under the bar.
   switch (design) {
+    case "liquid":
+      return {
+        full: false, align: "center",
+        // Colours, highlight, inner glow and gradient border: glass.css.
+        bar: { boxShadow: "var(--lg-shadow)" },
+        barClass: "lg-surface",
+        indicator: "dot", pad: 8,
+        // Taskbar radius stays in the 20-28px range (default --lg-dock-radius).
+        radius: Math.min(Math.max(s.cornerRadius, 20), 28),
+        margin: 10, taskbarLike: false,
+        fg: "var(--lg-fg)",
+      };
     case "tab":
       return {
         full: false, align: "center", edge: true,
@@ -80,7 +97,7 @@ export function dockLook(design: DockDesign, s: DockStyle, accent: string, dark:
     case "split":
       return {
         full: true, align: "center", split: true,
-        bar: { background: tint(dark, Math.max(alpha(s, 0.75), 0.3)), border: `1px solid ${border}`, boxShadow: "0 8px 26px rgba(0,0,0,0.2)", backdropFilter: "blur(18px) saturate(150%)" },
+        bar: { background: tint(dark, Math.max(alpha(s, 0.75), 0.3)), border: `1px solid ${border}`, boxShadow: "0 8px 26px rgba(0,0,0,0.2)" },
         indicator: "dot", pad: 7, radius: s.cornerRadius, margin: 12, taskbarLike: true, fg,
       };
     case "stack":
@@ -95,7 +112,7 @@ export function dockLook(design: DockDesign, s: DockStyle, accent: string, dark:
         bar: {},
         item: (id) => {
           const c = PASTELS[Math.abs(hash(id)) % PASTELS.length];
-          return { background: `${c}cc`, border: "1px solid rgba(255,255,255,0.35)", boxShadow: `0 6px 16px ${c}55`, backdropFilter: "blur(10px)" };
+          return { background: `${c}cc`, border: "1px solid rgba(255,255,255,0.35)", boxShadow: `0 6px 16px ${c}55` };
         },
         indicator: "line", wideIndicator: true, pad: 4, radius: s.cornerRadius, margin: 14, taskbarLike: false, fg,
       };
@@ -167,7 +184,6 @@ export function dockLook(design: DockDesign, s: DockStyle, accent: string, dark:
           background: tint(dark, Math.max(alpha(s, 0.7), 0.25)),
           border: `1px solid ${border}`,
           boxShadow: "0 6px 20px rgba(0,0,0,0.25)",
-          backdropFilter: "blur(14px)",
         },
         indicator: "dot",
         pad: 4,
@@ -195,6 +211,7 @@ export function dockLook(design: DockDesign, s: DockStyle, accent: string, dark:
 }
 
 export const DOCK_DESIGNS: { id: DockDesign; label: string; description: string }[] = [
+  { id: "liquid", label: "Liquid Glass", description: "iPhone-style glass bar" },
   { id: "glass", label: "Glass", description: "Frosted floating bar" },
   { id: "minimal", label: "Minimal", description: "Flat and quiet" },
   { id: "neon", label: "Neon", description: "Glowing accent outline" },

@@ -94,8 +94,8 @@ export function DockSection({ config, update }: SectionProps) {
             options={[{ value: "primary", label: "Main display" }, { value: "all", label: "All displays" }]}
             onChange={(v) => setDock({ monitor: v }, true)} />
         </Row>
-        <Row label="Hide the Windows taskbar" description="DeskFlow restores it when you turn this off or quit DeskFlow." htmlFor="d-tb">
-          <Toggle id="d-tb" label="Hide the Windows taskbar" checked={dock.hideTaskbar} onChange={(v) => setDock({ hideTaskbar: v }, true)} />
+        <Row label="Hide system taskbar" description="Hides the Windows taskbar on every monitor while the dock is on. It comes back when you turn this off, quit DeskFlow, sign out, or if DeskFlow crashes." htmlFor="d-tb">
+          <Toggle id="d-tb" label="Hide system taskbar" checked={dock.hideTaskbar} onChange={(v) => setDock({ hideTaskbar: v }, true)} />
         </Row>
         <Row label="Show running apps" description="Apps that are open but not pinned." htmlFor="d-run">
           <Toggle id="d-run" label="Show running apps" checked={dock.showRunning} onChange={(v) => setDock({ showRunning: v })} />
@@ -144,7 +144,7 @@ function DesignGrid(props: { value: DockDesign; style: DockStyle; accent: string
               className={`overflow-hidden rounded-xl border text-left transition ${selected ? "border-accent ring-2 ring-accent/40" : "border-line hover:border-muted"}`}>
               <div className="relative flex h-16 items-end justify-center" style={{ background: "linear-gradient(135deg,#3b1d4a,#0f172a 60%,#1e3a5f)" }}>
                 <div
-                  className={`flex items-center gap-1.5 ${look.full ? "w-full" : ""} ${look.align === "center" ? "justify-center" : "justify-start"}`}
+                  className={`flex items-center gap-1.5 ${look.full ? "w-full" : ""} ${look.align === "center" ? "justify-center" : "justify-start"} ${look.barClass ?? ""}`}
                   style={{
                     ...(look.split ? {} : look.bar),
                     borderRadius: look.full ? 0 : look.edge ? `${Math.min(look.radius, 12)}px ${Math.min(look.radius, 12)}px 0 0` : Math.min(look.radius, 12),

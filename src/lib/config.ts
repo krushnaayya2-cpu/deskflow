@@ -6,7 +6,7 @@ export type ThemeMode = "system" | "dark" | "light";
 
 export type IslandActivity = "music" | "timer" | "battery" | "network" | "downloads";
 
-export type IslandDesign = "glass" | "solid" | "notch" | "neon" | "aurora" | "minimal" | "frost";
+export type IslandDesign = "liquid" | "glass" | "solid" | "notch" | "neon" | "aurora" | "minimal" | "frost";
 
 export interface IslandConfig {
   enabled: boolean;
@@ -23,7 +23,7 @@ export interface IslandConfig {
 }
 
 export type DockDesign =
-  | "glass" | "minimal" | "neon" | "classic" | "pills" | "win11"
+  | "liquid" | "glass" | "minimal" | "neon" | "classic" | "pills" | "win11"
   | "tab" | "pebble" | "rail" | "underline" | "split" | "stack" | "tiles";
 export type IconStyle = "original" | "mono" | "silhouette";
 export type DockPosition = "bottom" | "left" | "right";

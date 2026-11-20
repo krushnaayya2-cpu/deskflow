@@ -1,0 +1,119 @@
+/* Liquid Glass theme: every design value for the island and dock glass in
+ * one place. Tweak here; nothing else hard-codes these numbers.
+ *
+ * Real blur comes from a native acrylic window under the shape (see
+ * src-tauri/src/glass.rs). CSS backdrop-filter can't blur the desktop from a
+ * transparent window, so these layers only add colour, highlight and edges.
+ * `html[data-glass="none"]` (set when native acrylic is unavailable) swaps
+ * in a solid fallback so text stays readable without blur.
+ */
+
+:root {
+  /* Motion: one spring-like curve for every morph. */
+  --lg-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --lg-duration: 400ms;
+
+  /* Shared glass (dock). Dark mode values. */
+  --lg-bg: rgba(255, 255, 255, 0.12);
+  --lg-blur: 24px; /* used only by the CSS fallback path */
+  --lg-saturate: 180%;
+  --lg-border: rgba(255, 255, 255, 0.25);
+  --lg-border-gradient: linear-gradient(160deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.08) 40%, rgba(255, 255, 255, 0.04) 60%, rgba(255, 255, 255, 0.3));
+  --lg-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  --lg-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  --lg-inner-glow: inset 0 0 18px rgba(255, 255, 255, 0.06);
+  --lg-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 48%);
+  --lg-fg: #ffffff;
+  --lg-muted: rgba(255, 255, 255, 0.62);
+  --lg-btn: rgba(255, 255, 255, 0.14);
+  --lg-track: rgba(255, 255, 255, 0.18);
+  --lg-fallback: rgba(28, 28, 34, 0.92);
+
+  /* Island: darker glass, softer sheen. */
+  --lg-island-bg: rgba(0, 0, 0, 0.55);
+  --lg-island-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 50%);
+  --lg-island-fallback: rgba(10, 10, 14, 0.94);
+
+  /* Radii. Island is always a pill (height / 2, set in code). */
+  --lg-dock-radius: 24px; /* 20-28px looks right */
+
+  /* Hover and press feedback. */
+  --lg-hover-scale: 1.15;
+  --lg-press-scale: 0.92;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --lg-bg: rgba(255, 255, 255, 0.42);
+    --lg-border: rgba(255, 255, 255, 0.6);
+    --lg-border-gradient: linear-gradient(160deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.35) 45%, rgba(0, 0, 0, 0.06) 70%, rgba(255, 255, 255, 0.7));
+    --lg-shadow: 0 8px 32px rgba(0, 0, 0, 0.16);
+    --lg-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    --lg-inner-glow: inset 0 0 18px rgba(255, 255, 255, 0.25);
+    --lg-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0) 55%);
+    --lg-fg: #14141a;
+    --lg-muted: rgba(0, 0, 0, 0.55);
+    --lg-btn: rgba(0, 0, 0, 0.07);
+    --lg-track: rgba(0, 0, 0, 0.14);
+    --lg-fallback: rgba(246, 246, 250, 0.95);
+    /* The island stays dark in light mode (like the iPhone), only lighter. */
+    --lg-island-bg: rgba(0, 0, 0, 0.62);
+  }
+}
+
+html[data-glass="none"] {
+  --lg-bg: var(--lg-fallback);
+  --lg-island-bg: var(--lg-island-fallback);
+}
+
+/* In Tailwind's "components" layer so utility classes (absolute, inset-0...)
+ * on the same element still win. */
+@layer components {
+/* The glass surface: tint, top sheen, highlight, inner glow, and a thin
+ * gradient border drawn with a mask (no extra element, follows any radius). */
+/* :where() keeps this at zero specificity so an element that is already
+ * `absolute` stays absolute; the ::before border needs a positioned parent. */
+:where(.lg-surface) {
+  position: relative;
+}
+.lg-surface {
+  background: var(--lg-sheen), var(--lg-bg);
+  box-shadow: var(--lg-highlight), var(--lg-inner-glow);
+  isolation: isolate;
+}
+.lg-surface.lg-island {
+  background: var(--lg-island-sheen), var(--lg-island-bg);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 0 16px rgba(255, 255, 255, 0.05);
+}
+.lg-surface::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: var(--lg-border-gradient);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 1;
+}
+.lg-surface.lg-island::before {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.06) 45%, rgba(255, 255, 255, 0.03) 60%, rgba(255, 255, 255, 0.22));
+}
+
+/* Without native blur and without CSS blur support: solid colour. With CSS
+ * blur support but no native acrylic, blur what the page itself draws. */
+@supports (backdrop-filter: blur(1px)) {
+  html[data-glass="none"] .lg-surface {
+    backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate));
+  }
+}
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --lg-duration: 0ms;
+    --lg-hover-scale: 1;
+  }
+}

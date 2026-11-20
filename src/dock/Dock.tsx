@@ -52,6 +52,7 @@ const groupOf = (it: Item) => (it.kind === "start" || it.kind === "search" ? 0 :
 const BOUNCE_MS = 1700;
 
 const media = window.matchMedia("(prefers-color-scheme: dark)");
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 export default function Dock() {
   const [config, setLocal] = useState<Config | null>(null);
@@ -227,15 +228,25 @@ export default function Dock() {
     : { x: 0, y: 0 };
 
   // ---- Magnification -------------------------------------------------------
+  const HOVER_SCALE = reduceMotion ? 1 : 1.15;
   const mag = (style?.magnification ?? 100) / 100;
   const dragging = dragOrder !== null;
   // Which items magnify: on full-width designs only the app group (Start
   // and the clock stay put at the screen edges).
   const magnifies = (it: Item) => it.kind === "app" || (it.kind === "start" && !look?.full) || (it.kind === "search" && !look?.full && !look?.split);
   const scales = useMemo(() => {
-    if (mouse === null || mag <= 1 || dragging || menu) return placed.map(() => 1);
+    if (mouse === null || dragging || menu) return placed.map(() => 1);
     const range = size * 2.6;
     const barStart = vertical ? bar.y : bar.x;
+    // Magnification off: the icon under the pointer still springs up to
+    // HOVER_SCALE (1.15, also --lg-hover-scale in glass.css) as feedback.
+    if (mag <= 1) {
+      return placed.map((p) => {
+        if (!magnifies(p.item)) return 1;
+        const a = barStart + p.pos;
+        return mouse >= a && mouse <= a + p.len ? HOVER_SCALE : 1;
+      });
+    }
     return placed.map((p) => {
       if (!magnifies(p.item)) return 1;
       const d = Math.abs(mouse - (barStart + p.pos + p.len / 2));
@@ -298,7 +309,7 @@ export default function Dock() {
       ];
     } else {
       // Include room for magnified icons + tooltip while hovering.
-      const grow = hovered ? size * (mag - 1) + 34 : 0;
+      const grow = hovered ? size * (Math.max(mag, 1.15) - 1) + 34 : 0;
       const g = grownBar;
       const r = !vertical
         ? { x: g.x - size, y: g.y - grow, w: g.w + size * 2, h: g.h + grow }
@@ -417,8 +428,11 @@ export default function Dock() {
                 ),
             )
           : Object.keys(look.bar).length > 0 && (
+              // Fix (corners): the bar fills its rect exactly and clips to its
+              // own radius; the native glass under it is inset a few px so
+              // no square corner can show (see src-tauri/src/glass.rs).
               <m.div
-                className="absolute"
+                className={`absolute ${look.barClass ?? ""}`}
                 style={{
                   ...look.bar,
                   borderRadius: look.edge
@@ -506,6 +520,7 @@ export default function Dock() {
                     ? { scale: { type: "spring", stiffness: 500, damping: 30 }, default: { duration: 0.8, repeat: 1, ease: "easeOut" } }
                     : { type: "spring", stiffness: 500, damping: 30 }
                 }
+                whileTap={{ scale: sc * 0.92 }}
                 onPointerDown={(e) => onPointerDown(e, it)}
                 onPointerUp={() => onPointerUp(it)}
                 onAuxClick={(e) => e.button === 1 && it.kind === "app" && launch(it.path)}

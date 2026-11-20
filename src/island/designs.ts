@@ -8,6 +8,10 @@ export interface DesignLook {
   surface: CSSProperties;
   /** Extra class names (for CSS keyframe animations). */
   className?: string;
+  /** Class names always on the surface (e.g. the Liquid Glass layers). */
+  surfaceClass?: string;
+  /** Put real (native acrylic) blur behind the pill. */
+  nativeGlass?: boolean;
   /** Shadow at rest and while a notification is blooming. */
   shadow: string;
   glow: (accent: string) => string;
@@ -25,12 +29,32 @@ export interface DesignLook {
 const dark = { fg: "#fff", muted: "rgba(255,255,255,0.55)", btn: "rgba(255,255,255,0.13)", track: "rgba(255,255,255,0.15)" };
 const glowFor = (a: string) => `0 0 0 1px ${a}88, 0 8px 30px ${a}55`;
 
+// No design uses CSS backdrop-filter: in a transparent window it can't see
+// the desktop, and its extra compositing layer drew square/black corners
+// behind the rounded pill while it morphed. Designs that want blur set
+// `nativeGlass` and get real acrylic from the backend instead.
 export const DESIGNS: Record<IslandDesign, { label: string; description: string; look: (accent: string) => DesignLook }> = {
+  liquid: {
+    label: "Liquid Glass",
+    description: "iPhone-style dark glass",
+    look: () => ({
+      // Colours live in src/styles/glass.css (.lg-surface.lg-island).
+      surface: {},
+      surfaceClass: "lg-surface lg-island",
+      nativeGlass: true,
+      shadow: "var(--lg-shadow)",
+      glow: (a) => `0 0 0 1px ${a}77, 0 8px 32px ${a}44, 0 8px 32px rgba(0,0,0,0.25)`,
+      ...dark,
+      muted: "rgba(255,255,255,0.62)",
+      btn: "rgba(255,255,255,0.14)",
+    }),
+  },
   glass: {
     label: "Glass",
     description: "Translucent dark glass",
     look: () => ({
-      surface: { background: "rgba(16,16,22,0.72)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(20px) saturate(160%)" },
+      surface: { background: "rgba(16,16,22,0.72)", border: "1px solid rgba(255,255,255,0.14)" },
+      nativeGlass: true,
       shadow: "0 6px 24px rgba(0,0,0,0.35)",
       glow: glowFor,
       ...dark,
@@ -93,7 +117,8 @@ export const DESIGNS: Record<IslandDesign, { label: string; description: string;
     label: "Minimal",
     description: "Slim and borderless",
     look: () => ({
-      surface: { background: "rgba(0,0,0,0.5)", backdropFilter: "blur(12px)" },
+      surface: { background: "rgba(0,0,0,0.5)" },
+      nativeGlass: true,
       shadow: "none",
       glow: (a) => `0 0 0 1px ${a}aa`,
       heightScale: 0.86,
@@ -104,7 +129,8 @@ export const DESIGNS: Record<IslandDesign, { label: string; description: string;
     label: "Frost",
     description: "Light glass, dark text",
     look: () => ({
-      surface: { background: "rgba(250,250,253,0.88)", border: "1px solid rgba(0,0,0,0.08)", backdropFilter: "blur(20px) saturate(160%)" },
+      surface: { background: "rgba(250,250,253,0.82)", border: "1px solid rgba(0,0,0,0.08)" },
+      nativeGlass: true,
       shadow: "0 8px 26px rgba(0,0,0,0.18)",
       glow: (a) => `0 0 0 1.5px ${a}, 0 10px 30px ${a}44`,
       fg: "#15151c",

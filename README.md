@@ -28,13 +28,15 @@ Built with **Tauri 2** (Rust + React/TypeScript + Tailwind). No Electron, no tel
 
 A dock with your pinned and running apps that can replace the Windows taskbar.
 
-- Thirteen designs: **Glass** (real Windows acrylic blur), **Minimal**, **Neon**, **Classic bar**, **Floating pills**, **Windows 11**, **Edge tab**, **Pebble**, **Rail**, **Underlined**, **Split** (Start/Search · apps · tray capsules), **Stack** (tray above apps) and **Pastel tiles**.
+- Fourteen designs: **Liquid Glass** (iPhone-style glass over real acrylic, follows light/dark mode; the default), **Glass** (real Windows acrylic blur), **Minimal**, **Neon**, **Classic bar**, **Floating pills**, **Windows 11**, **Edge tab**, **Pebble**, **Rail**, **Underlined**, **Split** (Start/Search · apps · tray capsules), **Stack** (tray above apps) and **Pastel tiles**.
 - System tray (Wi-Fi, volume, battery → Quick Settings; clock → calendar), Search button, icon styles (original, mono, accent silhouette), dividers between icons.
 - Pinned apps are imported from your taskbar on first run. Running apps show an indicator (focused app highlighted).
 - Click to open/focus (click again to minimise, or cycle windows), middle-click for a new window, right-click for Show / New window / Pin / Show in folder / Close. Drag icons to reorder pinned apps.
 - macOS-style magnification and a launch bounce.
 - Settings → *Dock*: icon size, spacing, corner radius, blur strength, opacity, accent, magnification, glass/solid/transparent background, bottom/left/right, auto-hide, main or all displays, Start button, clock, running apps, add apps from the Start menu.
-- **Hide the Windows taskbar** (optional). DeskFlow restores it, with its original auto-hide setting, when you turn the option off or quit.
+- **Hide system taskbar** (optional): hides the Windows taskbar on every monitor. DeskFlow restores it, with its original auto-hide setting, when you turn the option off, quit, sign out or shut down, and if DeskFlow crashes; if DeskFlow is killed outright, the next start restores it.
+- The dock reserves its strip of the screen on each monitor (a Windows AppBar, like the real taskbar), so maximised windows stop above it. Nothing is reserved while it auto-hides.
+- Icons spring to 1.15x under the pointer (or magnify macOS-style) and dip when pressed.
 - Themes: presets for every design plus Onyx, Silver, Indigo outline, Night shelf, Dusk pebble and Sage capsules, save your own, and export/import themes as `.json` files.
 
 ## File converter
@@ -53,7 +55,9 @@ A pill at the top-centre of the screen (click-through when you're not touching i
 
 - **Hover** to expand, **click** for details, **press and hold** for quick actions (1/5/15/25-minute timers, play/pause, settings).
 - Live activities: music from any media app (with previous/play-pause/next), timers, charger plugged in/out and low battery, Wi-Fi/network changes, and finished downloads (with Open and Show in folder).
-- Settings → *Dynamic Island*: on/off, size, glass or solid, main display or all displays, distance from top, hide when idle, which activities to show, and a **Show sample** preview button.
+- Designs: **Liquid Glass** (dark glass over real acrylic; the default), Glass, Solid, Notch, Neon, Aurora, Minimal, Frost. The island is a pill (radius = height / 2) that morphs between states (width, height and corners together on one 400 ms curve), sizes notifications to their text, and bounces gently on hover.
+- It stays centred at the top and is re-sized and re-centred whenever its size, the monitors or the display scaling change.
+- Settings → *Dynamic Island*: on/off, size (60-170%), design, main display or all displays, distance from top, hide when idle, which activities to show, and a **Show sample** preview button.
 - **Music player styles** (Settings → Dynamic Island): 16 themes — Spectrum, Cosmic Dust, Pixel Pulse, Aurora Flow, Liquid Chrome, Neon Orbit, Emerald Rain, Mono Wave, Holographic, Ice Glass, Solar Flare, Abyss Blue, Blood Moon, Dark Plasma, Phantom Green, Void Pulse — or match the island design. Each has a compact pill, a hover player bar and a full player (click) with album art, an audio-reactive visualizer, progress/seek, shuffle, repeat and system volume.
 - Bluetooth changes are added in a later step.
 
@@ -69,6 +73,10 @@ Settings → AI Apps. AI tasks and notifications appear in the Dynamic Island in
   - `DELETE /v1/tasks/{id}`.
 - **Dock:** AI apps found on your PC get their own section with a gradient ring that spins while a task runs.
 - Do not disturb, sound, and a history of recent notifications and tasks.
+
+## Design values
+
+All glass values (tint, border, highlight, shadow, radius, motion curve, hover scale, light-mode variants and the no-blur fallback) are CSS variables in `src/styles/glass.css`. Real blur comes from a native acrylic window under the island and the dock (`src-tauri/src/glass.rs`), because CSS `backdrop-filter` can't see the desktop from a transparent window.
 
 ## Settings file
 
