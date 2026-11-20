@@ -9,11 +9,11 @@
 //!   Used only by designs that have a glass bar.
 
 pub mod apps;
-mod glass;
 pub mod icons;
 pub mod taskbar;
 
 use crate::config::{Config, ConfigStore, DockBackground, DockDesign, DockPosition, DockTheme, IslandMonitor, PinnedApp};
+use crate::glass;
 use crate::overlay::{self, HitRect};
 use std::{collections::HashMap, sync::Mutex};
 use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
@@ -28,6 +28,10 @@ pub struct DockState {
     layout: Mutex<Option<(IslandMonitor, DockPosition, bool)>>,
     /// Native glass window per dock window label.
     glass: Mutex<HashMap<String, isize>>,
+    /// Bumped on every rebuild so new windows never reuse a label that a
+    /// just-destroyed window still holds (Tauri frees labels asynchronously,
+    /// and reusing one made window creation fail silently).
+    generation: std::sync::atomic::AtomicU32,
 }
 
 fn dock_windows(app: &AppHandle) -> Vec<WebviewWindow> {
@@ -73,6 +77,13 @@ pub fn init(app: &AppHandle, cfg: &Config) {
     sync(app, &app.state::<ConfigStore>().get());
 }
 
+/// Rebuild the docks from scratch (monitors or display scaling changed).
+pub fn rebuild(app: &AppHandle) {
+    let Some(state) = app.try_state::<DockState>() else { return };
+    *state.layout.lock().unwrap() = None;
+    sync(app, &app.state::<ConfigStore>().get());
+}
+
 /// Make windows and the taskbar match the config.
 pub fn sync(app: &AppHandle, cfg: &Config) {
     apply_taskbar(app, cfg);
@@ -80,11 +91,17 @@ pub fn sync(app: &AppHandle, cfg: &Config) {
     let mut layout = state.layout.lock().unwrap();
     let wanted = cfg.dock.enabled.then_some((cfg.dock.monitor, cfg.dock.style.position, cfg.dock.hide_taskbar));
     if *layout == wanted {
+        // Same windows; the reserved space may still need updating (icon
+        // size or auto-hide changed).
+        reserve_space(app, cfg);
         return;
     }
     for (_, h) in state.glass.lock().unwrap().drain() {
         glass::destroy(h);
     }
+    // Give the reserved space back first so the new docks are placed from
+    // the real work area.
+    taskbar::release_all();
     for w in dock_windows(app) {
         overlay::forget(app, w.label());
         let _ = w.destroy();
@@ -95,14 +112,51 @@ pub fn sync(app: &AppHandle, cfg: &Config) {
         IslandMonitor::Primary => app.primary_monitor().ok().flatten().into_iter().collect(),
         IslandMonitor::All => app.available_monitors().unwrap_or_default(),
     };
+    let gen = state.generation.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     for (i, m) in monitors.iter().enumerate() {
-        if let Err(e) = create(app, i, m, position, full_screen) {
-            log::warn!("could not create dock {i}: {e}");
+        if let Err(e) = create(app, gen, i, m, position, full_screen) {
+            crate::diag::trace(&format!("dock window {i} failed: {e}"));
         }
+    }
+    drop(layout);
+    reserve_space(app, cfg);
+}
+
+/// Reserve room for each dock on its monitor (an AppBar), so maximised
+/// windows stop at the dock instead of going under it. Nothing is reserved
+/// while the dock auto-hides.
+fn reserve_space(app: &AppHandle, cfg: &Config) {
+    let d = &cfg.dock;
+    let monitors = app.available_monitors().unwrap_or_default();
+    for w in dock_windows(app) {
+        #[cfg(windows)]
+        let hwnd = w.hwnd().map(|h| h.0 as isize).unwrap_or(0);
+        #[cfg(not(windows))]
+        let hwnd = w.label().len() as isize;
+        if !d.enabled || d.style.auto_hide {
+            taskbar::release(hwnd);
+            continue;
+        }
+        // The monitor this dock window is on.
+        let Ok(p) = w.outer_position() else { continue };
+        let Some(m) = monitors.iter().find(|m| {
+            let (mp, ms) = (m.position(), m.size());
+            p.x >= mp.x && p.x < mp.x + ms.width as i32 && p.y >= mp.y && p.y < mp.y + ms.height as i32
+        }) else {
+            continue;
+        };
+        let (mp, ms) = (m.position(), m.size());
+        let edge = match d.style.position {
+            DockPosition::Bottom => taskbar::Edge::Bottom,
+            DockPosition::Left => taskbar::Edge::Left,
+            DockPosition::Right => taskbar::Edge::Right,
+        };
+        let thickness = ((d.style.icon_size as f64 + 34.0) * m.scale_factor()) as i32;
+        taskbar::reserve(hwnd, edge, (mp.x, mp.y, mp.x + ms.width as i32, mp.y + ms.height as i32), thickness);
     }
 }
 
-fn create(app: &AppHandle, i: usize, m: &tauri::Monitor, pos: DockPosition, full_screen: bool) -> tauri::Result<()> {
+fn create(app: &AppHandle, gen: u32, i: usize, m: &tauri::Monitor, pos: DockPosition, full_screen: bool) -> tauri::Result<()> {
     // With the taskbar hidden the dock sits at the screen edge; otherwise it
     // sits just inside the work area (above the taskbar).
     let area = if full_screen {
@@ -128,11 +182,11 @@ fn create(app: &AppHandle, i: usize, m: &tauri::Monitor, pos: DockPosition, full
         ),
     };
 
+    let label = format!("{LABEL_PREFIX}{gen}-{i}");
     if let Some(h) = glass::create() {
-        app.state::<DockState>().glass.lock().unwrap().insert(format!("{LABEL_PREFIX}{i}"), h);
+        app.state::<DockState>().glass.lock().unwrap().insert(label.clone(), h);
     }
 
-    let label = format!("{LABEL_PREFIX}{i}");
     let win = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("dock.html".into()))
         .title("DeskFlow Dock")
         .inner_size(w as f64 / scale, h as f64 / scale)
@@ -166,13 +220,8 @@ fn apply_taskbar(app: &AppHandle, cfg: &Config) {
             c.dock.original_taskbar_autohide = Some(taskbar::is_autohide());
             let _ = store.set(c);
         }
-        let reserve = if d.style.auto_hide || d.style.position != DockPosition::Bottom {
-            0
-        } else {
-            let scale = app.primary_monitor().ok().flatten().map(|m| m.scale_factor()).unwrap_or(1.0);
-            ((d.style.icon_size as f64 + 34.0) * scale) as i32
-        };
-        taskbar::hide(reserve);
+        let original = app.state::<ConfigStore>().get().dock.original_taskbar_autohide.unwrap_or(false);
+        taskbar::hide(original);
     } else {
         restore_taskbar(app);
     }
@@ -191,6 +240,9 @@ pub fn restore_taskbar(app: &AppHandle) {
 /// Does this design draw a glass bar that should get real blur?
 fn wants_blur(cfg: &Config) -> bool {
     let s = &cfg.dock.style;
+    if s.design == DockDesign::Liquid {
+        return s.blur > 0;
+    }
     s.background == DockBackground::Glass
         && s.blur > 0
         && !matches!(s.design, DockDesign::Pills | DockDesign::Split | DockDesign::Underline | DockDesign::Tiles)
@@ -212,10 +264,9 @@ pub fn dock_set_bar(app: AppHandle, window: WebviewWindow, rect: Option<HitRect>
     };
     let scale = window.scale_factor().map_err(|e| e.to_string())?;
     let origin = window.outer_position().map_err(|e| e.to_string())?;
-    // Tint: dark or light following the app theme; more blur = less tint.
-    let dark = !matches!(cfg.appearance.theme, crate::config::ThemeMode::Light);
-    let (cr, cg, cb) = if dark { (18, 18, 26) } else { (245, 245, 250) };
-    let tint = ((100 - cfg.dock.style.blur) as f64 * 1.6 + 20.0).min(220.0) as u8;
+    // Tint: dark or light following the app theme (System = Windows' own
+    // app theme); more blur = less tint.
+    let tint = glass::tint(crate::windows::is_dark(cfg.appearance.theme), cfg.dock.style.blur as u32);
     #[cfg(windows)]
     let above = window.hwnd().map(|h| h.0 as isize).unwrap_or(0);
     #[cfg(not(windows))]
@@ -228,7 +279,8 @@ pub fn dock_set_bar(app: AppHandle, window: WebviewWindow, rect: Option<HitRect>
         (r.w * scale).round() as i32,
         (r.h * scale).round() as i32,
         (radius * scale).round() as i32,
-        (cr, cg, cb, tint),
+        glass::inset_for(scale),
+        tint,
     );
     Ok(())
 }

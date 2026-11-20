@@ -1,7 +1,16 @@
-//! Native acrylic "glass" window that sits directly under the dock bar.
+//! Native acrylic "glass": a tiny Win32 popup with the acrylic blur-behind
+//! accent policy, clipped to a rounded rectangle and placed directly under a
+//! transparent webview window (the dock bar or the Dynamic Island).
 //!
-//! A tiny Win32 popup with the acrylic blur-behind accent policy, clipped to
-//! the bar's rounded rectangle. Created on the main (UI) thread.
+//! Why native: CSS `backdrop-filter` inside a transparent WebView2 window
+//! only sees the webview's own (empty) pixels, never the desktop, so it
+//! can't blur what is behind the window. Acrylic is composited by DWM.
+//!
+//! Corner fix: GDI regions are 1-bit (no anti-aliasing), so a region the
+//! exact size of the CSS shape leaks jagged, square-looking pixels outside
+//! the CSS shape's anti-aliased edge. `show` therefore insets the region by
+//! `inset` physical pixels on every side (and shrinks the radius to match),
+//! so the region's stair-stepped edge always sits *under* the CSS border.
 
 #[cfg(windows)]
 mod imp {
@@ -106,15 +115,36 @@ mod imp {
     }
 
     /// Place the glass at (x, y, w, h) in physical pixels, rounded, tinted,
-    /// directly beneath `above` (the dock window).
-    pub fn show(hwnd: isize, above: isize, x: i32, y: i32, w: i32, h: i32, radius: i32, tint: (u8, u8, u8, u8)) {
+    /// directly beneath `above` (the webview window it backs). The region is
+    /// inset by `inset` px so no aliased corner pixel shows (see module docs).
+    #[allow(clippy::too_many_arguments)]
+    pub fn show(hwnd: isize, above: isize, x: i32, y: i32, w: i32, h: i32, radius: i32, inset: i32, tint: (u8, u8, u8, u8)) {
         let me = HWND(hwnd as _);
+        let i = inset.max(0).min(w / 2).min(h / 2);
+        let (w, h) = (w - 2 * i, h - 2 * i);
+        // A pill can't have a radius larger than half its short side.
+        let r = (radius - i).max(0).min(w.min(h) / 2);
+        if w <= 0 || h <= 0 {
+            return hide(hwnd);
+        }
         unsafe {
             set_acrylic(me, tint);
-            let rgn = CreateRoundRectRgn(0, 0, w + 1, h + 1, radius * 2, radius * 2);
+            let rgn = CreateRoundRectRgn(0, 0, w + 1, h + 1, r * 2, r * 2);
             SetWindowRgn(me, Some(rgn), true);
-            let _ = SetWindowPos(me, Some(HWND(above as _)), x, y, w, h, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+            let _ = SetWindowPos(me, Some(HWND(above as _)), x + i, y + i, w, h, SWP_NOACTIVATE | SWP_SHOWWINDOW);
         }
+    }
+
+    /// Acrylic blur-behind works from Windows 10 1803 (build 17134).
+    pub fn supported() -> bool {
+        use winreg::{enums::HKEY_LOCAL_MACHINE, RegKey};
+        RegKey::predef(HKEY_LOCAL_MACHINE)
+            .open_subkey(r"SOFTWARE\Microsoft\Windows NT\CurrentVersion")
+            .and_then(|k| k.get_value::<String, _>("CurrentBuildNumber"))
+            .ok()
+            .and_then(|b| b.parse::<u32>().ok())
+            .map(|b| b >= 17134)
+            .unwrap_or(false)
     }
 
     pub fn hide(hwnd: isize) {
@@ -136,9 +166,50 @@ mod imp {
         None
     }
     #[allow(clippy::too_many_arguments)]
-    pub fn show(_: isize, _: isize, _: i32, _: i32, _: i32, _: i32, _: i32, _: (u8, u8, u8, u8)) {}
+    pub fn show(_: isize, _: isize, _: i32, _: i32, _: i32, _: i32, _: i32, _: i32, _: (u8, u8, u8, u8)) {}
+    pub fn supported() -> bool {
+        false
+    }
     pub fn hide(_: isize) {}
     pub fn destroy(_: isize) {}
 }
 
 pub use imp::*;
+
+/// Inset (physical px) that keeps the aliased region inside a CSS shape
+/// drawn with a 1px border at this display scale.
+pub fn inset_for(scale: f64) -> i32 {
+    (scale * 1.5).ceil() as i32
+}
+
+/// Glass tint (r, g, b, alpha) for dark or light mode. `strength` is 0-100:
+/// more blur means less tint.
+pub fn tint(dark: bool, strength: u32) -> (u8, u8, u8, u8) {
+    let (r, g, b) = if dark { (18, 18, 26) } else { (245, 245, 250) };
+    (r, g, b, ((100 - strength.min(100)) as f64 * 1.6 + 20.0).min(220.0) as u8)
+}
+
+/// Whether native acrylic can be used here (Windows 10 1803+).
+#[tauri::command]
+pub fn glass_supported() -> bool {
+    supported()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn inset_grows_with_scale() {
+        assert_eq!(inset_for(1.0), 2);
+        assert_eq!(inset_for(1.25), 2);
+        assert_eq!(inset_for(1.5), 3);
+        assert_eq!(inset_for(2.0), 3);
+    }
+
+    #[test]
+    fn tint_is_lighter_with_more_blur() {
+        assert!(tint(true, 90).3 < tint(true, 10).3);
+        assert_eq!(tint(false, 50).0, 245);
+    }
+}

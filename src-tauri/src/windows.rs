@@ -79,3 +79,29 @@ pub fn set_low_memory(w: &tauri::WebviewWindow, low: bool) {
 
 #[cfg(not(windows))]
 pub fn set_low_memory(_w: &tauri::WebviewWindow, _low: bool) {}
+
+/// Is the app in dark mode? "System" follows Windows' app theme setting, so
+/// native glass tints match what the web pages get from
+/// `prefers-color-scheme`.
+pub fn is_dark(mode: ThemeMode) -> bool {
+    match mode {
+        ThemeMode::Dark => true,
+        ThemeMode::Light => false,
+        ThemeMode::System => system_is_dark(),
+    }
+}
+
+#[cfg(windows)]
+fn system_is_dark() -> bool {
+    use winreg::{enums::HKEY_CURRENT_USER, RegKey};
+    RegKey::predef(HKEY_CURRENT_USER)
+        .open_subkey(r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize")
+        .and_then(|k| k.get_value::<u32, _>("AppsUseLightTheme"))
+        .map(|light| light == 0)
+        .unwrap_or(true)
+}
+
+#[cfg(not(windows))]
+fn system_is_dark() -> bool {
+    true
+}

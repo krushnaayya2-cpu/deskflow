@@ -81,8 +81,10 @@ pub enum IslandSize {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum IslandStyle {
-    /// Translucent tinted glass with a light border.
+    /// iPhone-style "Liquid Glass": dark glass over real acrylic blur.
     #[default]
+    Liquid,
+    /// Translucent tinted glass with a light border.
     Glass,
     /// Opaque black, like a phone's island.
     Solid,
@@ -143,7 +145,7 @@ impl Default for IslandConfig {
             monitor: IslandMonitor::Primary,
             size: IslandSize::Medium,
             scale: 100,
-            style: IslandStyle::Glass,
+            style: IslandStyle::Liquid,
             offset_y: 8,
             hide_when_idle: false,
             activities: IslandActivities::default(),
@@ -159,8 +161,10 @@ impl Default for IslandConfig {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum DockDesign {
-    /// Floating frosted bar (real acrylic blur).
+    /// iPhone-style "Liquid Glass" bar over real acrylic blur.
     #[default]
+    Liquid,
+    /// Floating frosted bar (real acrylic blur).
     Glass,
     /// Flat, quiet, no border.
     Minimal,
@@ -248,7 +252,7 @@ pub struct DockStyle {
 impl Default for DockStyle {
     fn default() -> Self {
         Self {
-            design: DockDesign::Glass,
+            design: DockDesign::Liquid,
             background: DockBackground::Glass,
             icon_size: 48,
             spacing: 8,

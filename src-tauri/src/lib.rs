@@ -8,8 +8,10 @@ mod ai;
 mod commands;
 mod config;
 mod diag;
+mod displays;
 mod convert;
 mod dock;
+mod glass;
 mod hotkey;
 mod island;
 mod overlay;
@@ -70,6 +72,8 @@ pub fn run() {
             convert::convert_install,
             overlay::overlay_set_hit_rects,
             island::island_snapshot,
+            island::island_set_glass,
+            glass::glass_supported,
             island::island_demo,
             island::media_control,
             island::media_art,
@@ -124,6 +128,7 @@ pub fn run() {
             convert::init(handle, &cfg);
             let args: Vec<String> = std::env::args().collect();
             convert::handle_args(handle, &args);
+            displays::start(handle);
             perf::mark_started(started);
             diag::trace("started");
 
@@ -143,7 +148,11 @@ pub fn run() {
         // Only an explicit Quit (which passes an exit code) ends the process.
         RunEvent::ExitRequested { api, code, .. } if code.is_none() => api.prevent_exit(),
         // Never leave the Windows taskbar hidden after DeskFlow exits.
-        RunEvent::Exit => dock::restore_taskbar(app),
+        // Never leave the dock's reserved space behind either.
+        RunEvent::Exit => {
+            dock::restore_taskbar(app);
+            dock::taskbar::release_all();
+        }
         _ => {}
     });
 }

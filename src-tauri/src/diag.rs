@@ -27,6 +27,9 @@ pub fn init() {
     let prev = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         trace(&format!("PANIC: {info}"));
+        // The release build aborts on panic, so RunEvent::Exit never runs:
+        // bring the Windows taskbar back here.
+        crate::dock::taskbar::emergency_restore();
         prev(info);
     }));
 }
