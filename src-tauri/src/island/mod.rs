@@ -332,5 +332,8 @@ pub fn island_demo(app: AppHandle, step: u32) {
 
 #[tauri::command]
 pub fn open_settings(app: AppHandle) {
-    crate::windows::show_settings(&app);
+    // Deferred: creating a webview inside a WebView2 callback never finishes
+    // (see commands::update_config).
+    let a = app.clone();
+    let _ = app.run_on_main_thread(move || crate::windows::show_settings(&a));
 }

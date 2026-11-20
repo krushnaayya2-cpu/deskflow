@@ -48,17 +48,30 @@ pub fn update_config(app: &AppHandle, mut new: Config) -> Result<Config, String>
     }
 
     app.state::<ConfigStore>().set(new.clone())?;
-    if new.island != old.island {
-        island::sync(app, &new);
-    }
     if new.ai.api_enabled != old.ai.api_enabled || new.ai.api_port != old.ai.api_port || new.ai.api_token != old.ai.api_token {
         ai::sync(app, &new);
     }
-    if new.converter != old.converter {
-        convert::sync(app, &new);
-    }
-    if new.dock != old.dock || new.appearance != old.appearance {
-        dock::sync(app, &new);
+    // Fix (island/dock not appearing after a settings change): these may
+    // create webview windows. `set_config` runs inside WebView2's message
+    // callback on the UI thread, and WebView2 cannot create a new webview
+    // from inside its own callback: the build waits for the UI thread,
+    // which is busy running this command, so it never finished. Queue the
+    // work to run on the UI thread right after this command returns.
+    let (island_changed, convert_changed, dock_changed) =
+        (new.island != old.island, new.converter != old.converter, new.dock != old.dock || new.appearance != old.appearance);
+    if island_changed || convert_changed || dock_changed {
+        let (a, cfg) = (app.clone(), new.clone());
+        let _ = app.run_on_main_thread(move || {
+            if island_changed {
+                island::sync(&a, &cfg);
+            }
+            if convert_changed {
+                convert::sync(&a, &cfg);
+            }
+            if dock_changed {
+                dock::sync(&a, &cfg);
+            }
+        });
     }
     let saved = current_config(app);
     let _ = app.emit(CONFIG_CHANGED, &saved);
