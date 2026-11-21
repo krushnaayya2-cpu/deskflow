@@ -442,13 +442,14 @@ export default function Island() {
             <>
               <span className="lg-iris" aria-hidden />
               <span className="lg-spec" aria-hidden />
+              {mode !== "idle" && <span className="lg-scrim" aria-hidden />}
             </>
           )}
           {themed && mode !== "compact" && <Decoration theme={mTheme} s={s} />}
           <AnimatePresence mode="popLayout" initial={false}>
             <m.div
               key={`${mode}:${current.kind}:${current.kind === "transient" ? current.t.id : current.kind === "aiNote" ? current.note.id : current.kind === "ai" ? current.task.id + current.task.status : ""}`}
-              className="absolute inset-0 flex items-center"
+              className="absolute inset-0 z-[4] flex items-center"
               style={{ padding: aiCard?.bare ? 0 : `0 ${(isMusic ? 16 : aiCard ? 18 : 14) * s}px` }}
               // Cross-fade with opacity + scale only (no filter: blur, which
               // repaints every frame and dropped frames during the morph).
@@ -508,8 +509,15 @@ function Btn(props: { label: string; onClick: () => void; children: ReactNode; s
         height: 30 * s,
         minWidth: 30 * s,
         padding: `0 ${10 * s}px`,
-        background: props.primary ? props.accent : "var(--isl-btn)",
+        background: props.primary
+          ? `linear-gradient(160deg, ${props.accent}, ${props.accent}cc)`
+          : "var(--isl-btn)",
         color: props.primary ? "#fff" : undefined,
+        // Same material as the glass: a lit top edge and its own shadow.
+        boxShadow: props.primary
+          ? `inset 0 1px 0 rgba(255,255,255,0.5), 0 2px 8px ${props.accent}55`
+          : "inset 0 1px 0 rgba(255,255,255,0.18)",
+        border: props.primary ? "none" : "1px solid rgba(255,255,255,0.14)",
       }}
     >
       {props.children}
@@ -605,12 +613,24 @@ function Content(props: {
 
 function TransientView(props: { t: Transient; s: number; big: boolean; accent: string; details: boolean }) {
   const { t, s, big, accent } = props;
+  // A rounded tile rather than a faint circle: at a glance it reads as the
+  // activity's artwork, and it survives a busy background behind the glass.
   const icon = (n: ReactNode) => (
-    <div className="flex shrink-0 items-center justify-center rounded-full" style={{ width: 34 * s, height: 34 * s, background: `${accent}33`, color: accent }}>
+    <div
+      className="flex shrink-0 items-center justify-center"
+      style={{
+        width: 38 * s,
+        height: 38 * s,
+        borderRadius: 12 * s,
+        background: `linear-gradient(145deg, ${accent}, ${accent}aa)`,
+        boxShadow: `0 2px 8px ${accent}55, inset 0 1px 0 rgba(255,255,255,0.45)`,
+        color: "#fff",
+      }}
+    >
       {n}
     </div>
   );
-  const sz = { width: 18 * s, height: 18 * s };
+  const sz = { width: 19 * s, height: 19 * s };
   switch (t.kind) {
     case "download":
       return (
@@ -704,8 +724,18 @@ function Row(props: { s: number; left?: ReactNode; title?: ReactNode; subtitle?:
     <div className="flex w-full min-w-0 items-center" style={{ gap: 10 * props.s }}>
       {props.left}
       <div className="min-w-0 flex-1">
-        {props.title && <div className="truncate font-semibold leading-tight">{props.title}</div>}
-        {props.subtitle && <div className="truncate leading-tight isl-muted" style={{ fontSize: 12 * props.s, marginTop: 2 }}>{props.subtitle}</div>}
+        {props.title && (
+          <div className="truncate font-semibold leading-tight" style={{ fontSize: 15 * props.s }}>
+            {props.title}
+          </div>
+        )}
+        {props.subtitle && (
+          // Readability: the subtitle used to sit at the muted colour, which
+          // on glass over a busy wallpaper fell well under 4.5:1.
+          <div className="isl-sub truncate leading-tight" style={{ fontSize: 12.5 * props.s, marginTop: 2 }}>
+            {props.subtitle}
+          </div>
+        )}
       </div>
       {props.right && <div className={`shrink-0 ${props.compact ? "max-w-[40%] truncate" : ""}`}>{props.right}</div>}
     </div>

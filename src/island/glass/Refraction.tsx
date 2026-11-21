@@ -63,77 +63,61 @@ void main() {
     sdRound(p + e.yx, halfSize, uRadius) - sdRound(p - e.yx, halfSize, uRadius)
   ) + 1e-6);
 
-  // 0 deep inside the glass, 1 right at the rim: the bevel.
+  // 0 deep inside the glass, 1 right at the rim: the bevel. Everything
+  // below is driven by this, so the centre stays calm (readable) and the
+  // bending is concentrated in the rim band, the way thick glass behaves.
   float bevel = 1.0 - clamp(-d / uEdge, 0.0, 1.0);
-  float lens = pow(bevel, 1.45);
 
-  // ---- Liquid body -------------------------------------------------------
-  // Thick glass is never flat: the whole surface flows. Two octaves of a
-  // smooth wave field warp the view across the entire pill, not just at the
-  // edge, which is what makes it read as liquid rather than as a blurred
-  // rectangle.
-  vec2 q = p * 0.013;
-  float t = uTime * 0.22;
-  vec2 warp = vec2(
-    sin(q.y * 3.1 + t) + 0.55 * sin(q.x * 5.3 - t * 1.3),
-    cos(q.x * 2.7 - t * 0.9) + 0.55 * cos(q.y * 4.7 + t * 1.1)
-  );
-  warp += 0.4 * vec2(sin(q.y * 7.9 - t * 1.7), cos(q.x * 6.7 + t * 1.9));
-  vec2 flow = warp * uFlow;
+  // Displacement profile: ~0 through the middle, rising steeply at the rim.
+  float lens = pow(bevel, 2.6);
+  // Narrow band used for the colour split, so fringing never reaches the
+  // middle (where it reads as a glitch rather than as dispersion).
+  float band = smoothstep(0.2, 0.88, bevel);
 
-  // Refraction: the body magnifies slightly, like a thick lens, and near
-  // the rim the view is pushed outwards, so the background squeezes and
-  // stretches exactly as it does through a glass edge.
-  vec2 base = p * 0.88 + flow;
-  vec2 push = n * uBend * lens;
+  // A trace of flow, only in the rim band, so the edge looks poured rather
+  // than stamped. The centre is deliberately left undistorted.
+  vec2 q = p * 0.02;
+  float t = uTime * 0.25;
+  vec2 ripple = vec2(sin(q.y * 3.3 + t), cos(q.x * 2.9 - t * 0.8)) * uFlow * band;
+
+  // Refraction: the view is pushed outwards along the surface normal, so
+  // what is behind stretches towards the rim and squeezes into the edge.
+  vec2 push = n * uBend * lens + ripple;
+
+  // Chromatic aberration: three samples at slightly different strengths.
+  // The spread is scaled by the rim band, so R/G/B separate only where the
+  // glass is actually curved.
+  float spread = uChroma * band;
   vec3 col;
-  col.r = sampleAt(base + push * (1.0 + uChroma), halfSize).r;
-  col.g = sampleAt(base + push, halfSize).g;
-  col.b = sampleAt(base + push * (1.0 - uChroma), halfSize).b;
+  col.r = sampleAt(p + push * (1.0 + spread), halfSize).r;
+  col.g = sampleAt(p + push, halfSize).g;
+  col.b = sampleAt(p + push * (1.0 - spread), halfSize).b;
 
-  // A second, wider tap set pulls light in from further out, which is what
-  // makes a thick edge glow instead of just bending.
-  vec3 wide;
-  wide.r = sampleAt(base + push * (2.1 + uChroma), halfSize).r;
-  wide.g = sampleAt(base + push * 2.1, halfSize).g;
-  wide.b = sampleAt(base + push * (2.1 - uChroma), halfSize).b;
-  col = mix(col, wide, pow(bevel, 1.8) * 0.3);
-
-  // ---- Thin-film colour --------------------------------------------------
-  // Oil on water: the film thickness follows the same flow field, so the
-  // hues drift across the whole surface and bunch up at the edge.
-  float film = dot(warp, vec2(1.25, 0.85)) * 0.55 + length(p) * 0.004;
+  // Thin-film colour, kept to the rim band for the same reason.
   float ang = atan(n.y, n.x) / 6.2831853;
-  vec3 body = 0.5 + 0.5 * cos(6.2831853 * (vec3(0.0, 0.33, 0.67) + film + uTime * 0.02));
-  vec3 edge = 0.5 + 0.5 * cos(6.2831853 * (vec3(0.0, 0.33, 0.67) + ang * 1.3 + uTime * 0.03));
-  // Overlay-blend the film over the refracted image. Screen-blending it
-  // washed everything towards white; overlay keeps the darks dark, which is
-  // what makes the colour read as oil on glass.
-  vec3 tintCol = mix(body, edge, pow(bevel, 1.4));
-  float amount = uIris * mix(0.7, 1.0, pow(bevel, 1.6));
-  vec3 over = mix(2.0 * col * tintCol, 1.0 - 2.0 * (1.0 - col) * (1.0 - tintCol), step(0.5, col));
+  vec3 film = 0.5 + 0.5 * cos(6.2831853 * (vec3(0.0, 0.33, 0.67) + ang * 1.2 + bevel * 0.5 + uTime * 0.03));
+  float amount = uIris * pow(band, 1.4);
+  vec3 over = mix(2.0 * col * film, 1.0 - 2.0 * (1.0 - col) * (1.0 - film), step(0.5, col));
   col = mix(col, over, amount);
 
-  // Pull the saturation up so the colour reads as glass, not as haze.
+  // Vivid, not hazy: saturate what shows through and lift it slightly.
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
-  col = clamp(mix(vec3(lum), col, 1.6), 0.0, 1.0);
+  col = clamp(mix(vec3(lum), col, 1.55) * 1.06, 0.0, 1.0);
 
-  // Brighter at the rim, calmer in the middle: that reads as thick glass
-  // and keeps the UI text on top legible.
-  col *= mix(0.72, 1.0, pow(bevel, 0.8));
+  // The bevel catches light; the middle sits calmer and darker, which is
+  // what gives the content enough contrast to read against.
+  col *= mix(0.62, 1.0, pow(bevel, 0.7));
 
-  // Specular: a key light from the top-left and a softer one from below,
-  // plus the bright lit rim that reads as polished glass. The flow field
-  // bends the key light too, so highlights slide as the glass moves.
-  vec2 nf = normalize(n + warp * 0.12);
-  vec2 L = normalize(vec2(-0.55, 0.83));
-  vec2 L2 = normalize(vec2(0.6, -0.8));
-  float spec = pow(max(dot(nf, L), 0.0), 4.0) * mix(0.35, 1.0, bevel);
-  float spec2 = pow(max(dot(n, L2), 0.0), 9.0) * bevel * 0.5;
-  float rim = pow(bevel, 4.0);
-  col += vec3((spec + spec2) * 0.42 + rim * 0.3);
+  // Specular: a key light from the top-left, a softer fill from the
+  // bottom-right, and the lit rim that makes the edge look thick.
+  vec2 L = normalize(vec2(-0.6, 0.8));
+  vec2 L2 = normalize(vec2(0.7, -0.72));
+  float spec = pow(max(dot(n, L), 0.0), 3.2) * pow(bevel, 1.2);
+  float spec2 = pow(max(dot(n, L2), 0.0), 6.0) * pow(bevel, 1.6) * 0.45;
+  float rim = pow(bevel, 5.0);
+  col += vec3(spec * 0.62 + spec2 * 0.45 + rim * 0.38);
 
-  // A little darker so UI text stays readable over bright wallpapers.
+  // Overall tint, for text contrast over bright wallpapers.
   col = mix(col, col * 0.55, uTint);
 
   frag = vec4(col, alpha);
@@ -224,9 +208,9 @@ export function Refraction({ w, h, radius, x, y, active, onUnsupported }: Refrac
     const u = (n: string) => gl.getUniformLocation(prog, n);
     const uWin = u("uWin"), uPill = u("uPill"), uPillPos = u("uPillPos"), uRadius = u("uRadius");
     const uEdge = u("uEdge"), uBend = u("uBend"), uTime = u("uTime"), uFlow = u("uFlow");
-    gl.uniform1f(u("uChroma"), 0.55);
-    gl.uniform1f(u("uTint"), 0.46);
-    gl.uniform1f(u("uIris"), 0.55);
+    gl.uniform1f(u("uChroma"), 0.26);
+    gl.uniform1f(u("uTint"), 0.42);
+    gl.uniform1f(u("uIris"), 0.45);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
@@ -301,12 +285,13 @@ export function Refraction({ w, h, radius, x, y, active, onUnsupported }: Refrac
       gl.uniform2f(uPillPos, g.x, g.y);
       gl.uniform1f(uRadius, g.radius);
       // The bevel scales with the pill so small pills do not look chunky.
-      // A thick glass edge: it is what gives the reference its depth.
-      const edge = Math.max(14, Math.min(g.h * 0.55, 46));
+      // A thick glass edge: it is what gives the reference its depth. The
+      // bend is large because the profile concentrates it at the rim.
+      const edge = Math.max(14, Math.min(g.h * 0.5, 42));
       gl.uniform1f(uEdge, edge);
-      gl.uniform1f(uBend, edge * 1.7);
+      gl.uniform1f(uBend, edge * 2.2);
       // The flow scales with the pill so a small pill ripples less.
-      gl.uniform1f(uFlow, Math.min(g.h, g.w) * 0.13 + 4);
+      gl.uniform1f(uFlow, Math.min(g.h, g.w) * 0.05 + 2);
       gl.uniform1f(uTime, (performance.now() - start) / 1000);
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
