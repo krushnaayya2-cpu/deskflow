@@ -96,8 +96,12 @@ void main() {
   // into ghosted, striped copies of itself.
   vec2 push = n * uBend * lens;
 
-  // Frosted in the middle, clear at the rim.
-  float radius = mix(uBlur, 0.8, pow(bevel, 0.75));
+  // Frosted in the middle, clear at the rim -- and frostier still where
+  // what is behind is bright, which is exactly where UI text loses
+  // contrast. One cheap probe decides it per pixel, so a dark background
+  // stays sharp and glassy while a white headline behind dissolves.
+  float probe = dot(sampleAt(p + push, halfSize), vec3(0.299, 0.587, 0.114));
+  float radius = mix(uBlur, 0.8, pow(bevel, 0.75)) * (1.0 + 0.95 * smoothstep(0.45, 0.95, probe));
   vec3 col = discSample(p + push, radius, halfSize);
 
   // Chromatic aberration as a fixed distance, not a fraction of the push,
@@ -136,7 +140,7 @@ void main() {
   float spec2 = pow(max(dot(n, L2), 0.0), 3.0) * pow(bevel, 1.1);
   float facing = max(pow(max(dot(n, L), 0.0), 3.2), pow(max(dot(n, L2), 0.0), 3.2));
   float rim = pow(bevel, 4.5) * (0.06 + 0.94 * facing);
-  col += vec3(spec * 0.62 + spec2 * 0.42 + rim * 0.7);
+  col += vec3(spec * 0.5 + spec2 * 0.34 + rim * 0.56);
 
   col = mix(col, col * 0.55, uTint);
 
@@ -230,7 +234,7 @@ export function Refraction({ w, h, radius, x, y, active, onUnsupported }: Refrac
     const uEdge = u("uEdge"), uBend = u("uBend"), uTime = u("uTime"), uFlow = u("uFlow"), uBlur = u("uBlur");
     gl.uniform1f(u("uChroma"), 1.8);   // px between R and B at the rim
     gl.uniform1f(u("uTint"), 0.14);
-    gl.uniform1f(u("uIris"), 0.4);
+    gl.uniform1f(u("uIris"), 0.34);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 

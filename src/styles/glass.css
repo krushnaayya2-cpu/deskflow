@@ -188,6 +188,14 @@ html[data-glass="none"] {
       radial-gradient(36% 125% at 20% 50%, rgba(8, 8, 14, 0.36) 0%, rgba(8, 8, 14, 0) 72%),
       radial-gradient(58% 140% at 28% 50%, rgba(8, 8, 14, 0.24) 0%, rgba(8, 8, 14, 0.13) 48%, rgba(8, 8, 14, 0) 76%);
   }
+  /* Without the shader there is no frosting, so the text needs a little
+   * more help from the scrim. */
+  .lg-prism:not(.lg-refract) > .lg-scrim {
+    background:
+      radial-gradient(40% 130% at 20% 50%, rgba(8, 8, 14, 0.46) 0%, rgba(8, 8, 14, 0) 74%),
+      radial-gradient(62% 145% at 30% 50%, rgba(8, 8, 14, 0.34) 0%, rgba(8, 8, 14, 0.2) 48%, rgba(8, 8, 14, 0) 78%);
+  }
+
   .isl-sub {
     color: rgba(255, 255, 255, 0.93);
   }
