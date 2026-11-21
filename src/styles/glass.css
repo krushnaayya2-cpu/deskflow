@@ -176,9 +176,12 @@ html[data-glass="none"] {
     pointer-events: none;
     /* Below the content (which paints after it), above the glass layers. */
     z-index: 3;
+    /* Only what the text needs: a soft pool behind the text column, and a
+     * barely-there wash over the rest. The heavy version read as a tinted
+     * overlay and turned warm colours behind the glass muddy. */
     background:
-      linear-gradient(90deg, rgba(16, 16, 24, 0.46) 0%, rgba(16, 16, 24, 0.36) 55%, rgba(16, 16, 24, 0.12) 100%),
-      radial-gradient(130% 120% at 50% 50%, rgba(16, 16, 24, 0.22) 0%, rgba(16, 16, 24, 0) 100%);
+      radial-gradient(62% 150% at 26% 50%, rgba(8, 8, 14, 0.36) 0%, rgba(8, 8, 14, 0.18) 45%, rgba(8, 8, 14, 0) 78%),
+      linear-gradient(0deg, rgba(8, 8, 14, 0.1), rgba(8, 8, 14, 0.1));
   }
   .isl-sub {
     color: rgba(255, 255, 255, 0.93);

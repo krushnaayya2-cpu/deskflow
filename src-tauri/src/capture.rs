@@ -100,8 +100,10 @@ mod imp {
 
 
 
-/// Longest edge of the grabbed image. Small on purpose: it is the blur.
-const MAX_EDGE: i32 = 256;
+/// Longest edge of the grabbed image. Enough detail that the bending at
+/// the rim is visible; at 256 the background was already mush, so the
+/// curve had nothing to show.
+const MAX_EDGE: i32 = 512;
 
 /// Target size for a capture of `w` x `h` physical px.
 pub fn target_size(w: i32, h: i32, max_edge: i32) -> (i32, i32) {

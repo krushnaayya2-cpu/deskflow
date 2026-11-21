@@ -509,15 +509,17 @@ function Btn(props: { label: string; onClick: () => void; children: ReactNode; s
         height: 30 * s,
         minWidth: 30 * s,
         padding: `0 ${10 * s}px`,
+        // Tinted glass rather than a flat fill: the accent is translucent,
+        // the top edge is lit and the body carries its own sheen, so the
+        // button is made of the same material as the pill.
         background: props.primary
-          ? `linear-gradient(160deg, ${props.accent}, ${props.accent}cc)`
+          ? `linear-gradient(170deg, rgba(255,255,255,0.3), rgba(255,255,255,0.04) 45%), ${props.accent}bb`
           : "var(--isl-btn)",
         color: props.primary ? "#fff" : undefined,
-        // Same material as the glass: a lit top edge and its own shadow.
         boxShadow: props.primary
-          ? `inset 0 1px 0 rgba(255,255,255,0.5), 0 2px 8px ${props.accent}55`
-          : "inset 0 1px 0 rgba(255,255,255,0.18)",
-        border: props.primary ? "none" : "1px solid rgba(255,255,255,0.14)",
+          ? `inset 0 1px 0 rgba(255,255,255,0.65), inset 0 -1px 0 rgba(0,0,0,0.18), 0 2px 10px ${props.accent}66`
+          : "inset 0 1px 0 rgba(255,255,255,0.2)",
+        border: props.primary ? "1px solid rgba(255,255,255,0.3)" : "1px solid rgba(255,255,255,0.14)",
       }}
     >
       {props.children}
@@ -622,8 +624,10 @@ function TransientView(props: { t: Transient; s: number; big: boolean; accent: s
         width: 38 * s,
         height: 38 * s,
         borderRadius: 12 * s,
-        background: `linear-gradient(145deg, ${accent}, ${accent}aa)`,
-        boxShadow: `0 2px 8px ${accent}55, inset 0 1px 0 rgba(255,255,255,0.45)`,
+        background: `linear-gradient(160deg, rgba(255,255,255,0.34), rgba(255,255,255,0.04) 48%), linear-gradient(145deg, ${accent}, ${accent}aa)`,
+        // Lit top edge and a faint inner glow, like the pill's own bevel.
+        boxShadow: `0 2px 8px ${accent}55, inset 0 1px 0 rgba(255,255,255,0.7), inset 0 0 10px rgba(255,255,255,0.18)`,
+        border: "1px solid rgba(255,255,255,0.22)",
         color: "#fff",
       }}
     >
