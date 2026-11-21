@@ -158,7 +158,23 @@ html[data-glass="none"] {
       inset 10px 0 14px -11px rgba(63, 140, 255, var(--pr-bleed)),
       inset -10px 0 14px -11px rgba(255, 45, 149, var(--pr-bleed)),
       inset 0 -9px 14px -12px rgba(53, 255, 208, calc(var(--pr-bleed) * 0.8)),
-      inset 0 8px 14px -13px rgba(255, 216, 77, calc(var(--pr-bleed) * 0.6));
+      inset 0 8px 14px -13px rgba(255, 216, 77, calc(var(--pr-bleed) * 0.6)),
+      /* A hairline outside the glass plus a soft drop: without these the
+       * shape loses its outline against a white background. */
+      0 0 0 1px rgba(0, 0, 0, 0.14),
+      0 8px 30px rgba(0, 0, 0, 0.18);
+  }
+
+  /* With the refraction shader running, the CSS layers only finish the
+   * edge: the shader already draws the blur, the dispersion and the
+   * specular. Stacking the full sheen on top of it was what showed as soft
+   * horizontal streaks over a flat bright background. */
+  .lg-prism.lg-refract {
+    --pr-sheen: 0.16;
+    --pr-bleed: 0.14;
+    --pr-rim-opacity: 0.6;
+    --pr-glow-opacity: 0.4;
+    background: none;
   }
 
   /* Readability on glass. White text over a busy wallpaper falls far below
@@ -185,8 +201,8 @@ html[data-glass="none"] {
     background:
       /* steadies the start of the text, where a bright shape behind is
        * most likely to run through the first word */
-      radial-gradient(36% 125% at 20% 50%, rgba(8, 8, 14, 0.36) 0%, rgba(8, 8, 14, 0) 72%),
-      radial-gradient(58% 140% at 28% 50%, rgba(8, 8, 14, 0.24) 0%, rgba(8, 8, 14, 0.13) 48%, rgba(8, 8, 14, 0) 76%);
+      radial-gradient(38% 130% at 20% 50%, rgba(8, 8, 14, 0.44) 0%, rgba(8, 8, 14, 0) 74%),
+      radial-gradient(62% 145% at 28% 50%, rgba(8, 8, 14, 0.32) 0%, rgba(8, 8, 14, 0.18) 48%, rgba(8, 8, 14, 0) 78%);
   }
   /* Without the shader there is no frosting, so the text needs a little
    * more help from the scrim. */
@@ -197,7 +213,9 @@ html[data-glass="none"] {
   }
 
   .isl-sub {
-    color: rgba(255, 255, 255, 0.93);
+    /* Fully opaque: at 93% the subtitle lost roughly half a stop of
+     * contrast exactly where it could least afford it. */
+    color: #fff;
   }
 
   /* Rainbow rim + outer glow. Two rings: a tight bright one and a wider

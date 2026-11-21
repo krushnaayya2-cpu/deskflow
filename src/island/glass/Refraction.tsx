@@ -125,12 +125,14 @@ void main() {
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
   col = clamp(mix(vec3(lum), col, 1.5) * 1.04, 0.0, 1.0);
 
-  // Contrast where it is actually needed. A flat tint over the whole pill
-  // reads as dark plastic and muddies colour; instead only what is already
-  // bright gets pulled down, and only in the calm centre where the UI text
-  // sits. Dark backgrounds pass through untouched.
-  float bright = smoothstep(0.4, 0.95, lum);
-  col *= mix(mix(1.0, 0.52, bright), 1.0, pow(bevel, 1.3));
+  // Adaptive tint. A single tint everywhere either muddies colour or, on a
+  // white background, lands the glass in mid-grey -- the worst case for
+  // white text. So the brighter what is behind, the further it is pulled
+  // down: a white wall becomes a properly dark glass, the way an iOS dark
+  // notification sits on a light page, while dark and colourful
+  // backgrounds pass through nearly untouched.
+  float bright = smoothstep(0.3, 0.88, lum);
+  col *= mix(mix(1.0, 0.19, bright), 1.0, pow(bevel, 1.3));
 
   // Specular: directional, bright at the top-left and bottom-right and
   // fading elsewhere, which is how a curved bevel catches light.
