@@ -179,9 +179,10 @@ html[data-glass="none"] {
     /* Only what the text needs: a soft pool behind the text column, and a
      * barely-there wash over the rest. The heavy version read as a tinted
      * overlay and turned warm colours behind the glass muddy. */
-    background:
-      radial-gradient(62% 150% at 26% 50%, rgba(8, 8, 14, 0.36) 0%, rgba(8, 8, 14, 0.18) 45%, rgba(8, 8, 14, 0) 78%),
-      linear-gradient(0deg, rgba(8, 8, 14, 0.1), rgba(8, 8, 14, 0.1));
+    /* The glass is frosted through the middle now, so this only has to
+     * steady the text: a faint pool behind the text block, nothing over the
+     * rest of the pill. */
+    background: radial-gradient(58% 140% at 26% 50%, rgba(8, 8, 14, 0.26) 0%, rgba(8, 8, 14, 0.14) 48%, rgba(8, 8, 14, 0) 76%);
   }
   .isl-sub {
     color: rgba(255, 255, 255, 0.93);

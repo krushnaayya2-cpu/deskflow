@@ -33,6 +33,7 @@ uniform float uBend;     // how far the edge pushes the sample (css px)
 uniform float uChroma;   // colour split at the edge
 uniform float uTint;     // darkening, for text contrast
 uniform float uIris;     // thin-film strength
+uniform float uBlur;     // frost radius at the centre of the glass (css px)
 uniform float uFlow;     // how far the liquid flow warps the view (css px)
 uniform float uTime;
 
@@ -47,16 +48,18 @@ vec3 sampleAt(vec2 p, vec2 halfSize) {
   return texture(uTex, clamp(win, vec2(0.002), vec2(0.998))).rgb;
 }
 
-// The same, softened. A hard edge behind the glass (the rim of a black
-// circle, say) tears into a hard colour line when the three channels are
-// displaced; a small blur first turns that into a gradient.
-vec3 softSample(vec2 p, vec2 halfSize) {
-  vec3 c = sampleAt(p, halfSize) * 0.4;
-  c += sampleAt(p + vec2(1.1, 0.0), halfSize) * 0.15;
-  c += sampleAt(p + vec2(-1.1, 0.0), halfSize) * 0.15;
-  c += sampleAt(p + vec2(0.0, 1.1), halfSize) * 0.15;
-  c += sampleAt(p + vec2(0.0, -1.1), halfSize) * 0.15;
-  return c;
+// Nine taps on a golden-angle disc. The radius varies across the glass:
+// wide through the middle, so large bright shapes behind (headline text,
+// say) dissolve into soft colour that UI text can sit on, and nearly zero
+// at the rim, where the refraction has to stay sharp to read as bending.
+vec3 discSample(vec2 p, float r, vec2 halfSize) {
+  vec3 c = sampleAt(p, halfSize);
+  for (int i = 0; i < 8; i++) {
+    float a = 2.39996 * float(i);
+    float rr = r * sqrt((float(i) + 0.5) / 8.0);
+    c += sampleAt(p + vec2(cos(a), sin(a)) * rr, halfSize);
+  }
+  return c / 9.0;
 }
 
 void main() {
@@ -81,9 +84,11 @@ void main() {
   float bevel = 1.0 - clamp(-d / uEdge, 0.0, 1.0);
 
   // Displacement profile: flat through the middle, rising into the rim.
-  float lens = pow(bevel, 2.0);
+  // A wider exponent than before spreads the bend across more of the rim
+  // band, so the curve is visible rather than hugging the last few pixels.
+  float lens = pow(bevel, 1.6);
   // Band the colour split lives in, so fringing never reaches the centre.
-  float band = smoothstep(0.1, 0.9, bevel);
+  float band = smoothstep(0.08, 0.8, bevel);
 
   // Refraction: the view is pushed outwards along the surface normal, so
   // what is behind stretches towards the rim and squeezes into the edge.
@@ -91,14 +96,18 @@ void main() {
   // into ghosted, striped copies of itself.
   vec2 push = n * uBend * lens;
 
-  // Chromatic aberration as a fixed distance, not a fraction of the push:
-  // scaling it by the push separated the channels by tens of pixels at the
-  // rim, which is what turned a hard edge into a red stripe.
+  // Frosted in the middle, clear at the rim.
+  float radius = mix(uBlur, 0.8, pow(bevel, 0.75));
+  vec3 col = discSample(p + push, radius, halfSize);
+
+  // Chromatic aberration as a fixed distance, not a fraction of the push,
+  // and faded out towards the centre so only the rim carries rainbow edges.
   vec2 split = n * uChroma * band;
-  vec3 col;
-  col.r = softSample(p + push + split, halfSize).r;
-  col.g = softSample(p + push, halfSize).g;
-  col.b = softSample(p + push - split, halfSize).b;
+  if (band > 0.004) {
+    float rs = max(0.8, radius * 0.3);
+    col.r = mix(col.r, discSample(p + push + split, rs, halfSize).r, band);
+    col.b = mix(col.b, discSample(p + push - split, rs, halfSize).b, band);
+  }
 
   // Thin-film colour, kept to the rim band.
   float ang = atan(n.y, n.x) / 6.2831853;
@@ -112,10 +121,12 @@ void main() {
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
   col = clamp(mix(vec3(lum), col, 1.5) * 1.04, 0.0, 1.0);
 
-  // A whisper of shading towards the middle, far lighter than before: the
-  // heavy version made the glass read as dark plastic and turned warm
-  // colours behind it muddy.
-  col *= mix(0.9, 1.0, pow(bevel, 0.7));
+  // Contrast where it is actually needed. A flat tint over the whole pill
+  // reads as dark plastic and muddies colour; instead only what is already
+  // bright gets pulled down, and only in the calm centre where the UI text
+  // sits. Dark backgrounds pass through untouched.
+  float bright = smoothstep(0.4, 0.95, lum);
+  col *= mix(mix(1.0, 0.52, bright), 1.0, pow(bevel, 1.3));
 
   // Specular: directional, bright at the top-left and bottom-right and
   // fading elsewhere, which is how a curved bevel catches light.
@@ -123,8 +134,9 @@ void main() {
   vec2 L2 = normalize(vec2(0.62, -0.78));
   float spec = pow(max(dot(n, L), 0.0), 3.0) * pow(bevel, 1.1);
   float spec2 = pow(max(dot(n, L2), 0.0), 3.6) * pow(bevel, 1.2);
-  float rim = pow(bevel, 5.0) * (0.35 + 0.65 * max(pow(max(dot(n, L), 0.0), 2.0), pow(max(dot(n, L2), 0.0), 2.0)));
-  col += vec3(spec * 0.5 + spec2 * 0.32 + rim * 0.5);
+  float facing = max(pow(max(dot(n, L), 0.0), 2.2), pow(max(dot(n, L2), 0.0), 2.2));
+  float rim = pow(bevel, 5.0) * (0.12 + 0.88 * facing);
+  col += vec3(spec * 0.5 + spec2 * 0.34 + rim * 0.6);
 
   col = mix(col, col * 0.55, uTint);
 
@@ -215,8 +227,8 @@ export function Refraction({ w, h, radius, x, y, active, onUnsupported }: Refrac
 
     const u = (n: string) => gl.getUniformLocation(prog, n);
     const uWin = u("uWin"), uPill = u("uPill"), uPillPos = u("uPillPos"), uRadius = u("uRadius");
-    const uEdge = u("uEdge"), uBend = u("uBend"), uTime = u("uTime"), uFlow = u("uFlow");
-    gl.uniform1f(u("uChroma"), 4.5);   // px between R and B at the rim
+    const uEdge = u("uEdge"), uBend = u("uBend"), uTime = u("uTime"), uFlow = u("uFlow"), uBlur = u("uBlur");
+    gl.uniform1f(u("uChroma"), 3.0);   // px between R and B at the rim
     gl.uniform1f(u("uTint"), 0.14);
     gl.uniform1f(u("uIris"), 0.4);
     gl.enable(gl.BLEND);
@@ -295,10 +307,13 @@ export function Refraction({ w, h, radius, x, y, active, onUnsupported }: Refrac
       // The bevel scales with the pill so small pills do not look chunky.
       // A thick glass edge: it is what gives the reference its depth. The
       // bend is large because the profile concentrates it at the rim.
-      const edge = Math.max(16, Math.min(g.h * 0.55, 46));
+      // A wider rim band, and a strong enough push inside it to visibly
+      // curve the background into the edge.
+      const edge = Math.max(18, Math.min(g.h * 0.62, 54));
       gl.uniform1f(uEdge, edge);
-      // Strong enough at the rim to visibly curve the background into it.
-      gl.uniform1f(uBend, Math.min(Math.max(edge * 1.6, 30), 60));
+      gl.uniform1f(uBend, Math.min(Math.max(edge * 2.0, 38), 72));
+      // Frost scales with the pill: enough to dissolve big shapes behind.
+      gl.uniform1f(uBlur, Math.max(6, Math.min(g.h * 0.22, 13)));
       // The flow scales with the pill so a small pill ripples less.
       gl.uniform1f(uFlow, 0);
       gl.uniform1f(uTime, (performance.now() - start) / 1000);

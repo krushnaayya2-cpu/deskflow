@@ -513,7 +513,7 @@ function Btn(props: { label: string; onClick: () => void; children: ReactNode; s
         // the top edge is lit and the body carries its own sheen, so the
         // button is made of the same material as the pill.
         background: props.primary
-          ? `linear-gradient(170deg, rgba(255,255,255,0.3), rgba(255,255,255,0.04) 45%), ${props.accent}bb`
+          ? `linear-gradient(176deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.1) 44%, rgba(255,255,255,0) 46%), ${props.accent}8c`
           : "var(--isl-btn)",
         color: props.primary ? "#fff" : undefined,
         boxShadow: props.primary
