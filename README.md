@@ -82,6 +82,8 @@ The displacement profile is near zero through the middle and rises steeply at th
 
 The dock's Liquid Glass design uses the same shader, so the whole overlay UI matches.
 
+Refraction is also switched off automatically when the system asks for reduced transparency, and the glass becomes an opaque surface.
+
 Settings → Dynamic Island → **Refraction** turns it off, falling back to Windows acrylic blur plus the CSS glass skin. While refraction is on, the island is left out of other apps' screen recordings and screenshots: that is what stops it refracting its own last frame.
 
 ## Design values

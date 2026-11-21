@@ -109,6 +109,15 @@ export default function Island() {
   const [vw, setVw] = useState(window.innerWidth);
   const [nativeGlassOk, setNativeGlassOk] = useState(false);
   const [refractOk, setRefractOk] = useState(true);
+  // Accessibility: someone who asks for less transparency should not get a
+  // window that samples and bends the screen behind it.
+  const [lessTransparency, setLessTransparency] = useState(() => window.matchMedia("(prefers-reduced-transparency: reduce)").matches);
+  useEffect(() => {
+    const m = window.matchMedia("(prefers-reduced-transparency: reduce)");
+    const on = () => setLessTransparency(m.matches);
+    m.addEventListener("change", on);
+    return () => m.removeEventListener("change", on);
+  }, []);
   const pillRef = useRef<HTMLDivElement>(null);
 
   // ---- Data subscriptions ------------------------------------------------
@@ -369,7 +378,7 @@ export default function Island() {
   // Refraction replaces the acrylic for the Liquid Glass design: it draws
   // the blurred, bent background itself, so a second blurred layer beneath
   // would only wash it out.
-  const wantsRefract = !!look.prism && !!config.island.refraction && refractOk && !aiCard && !themed && !hidden;
+  const wantsRefract = !!look.prism && !!config.island.refraction && refractOk && !lessTransparency && !aiCard && !themed && !hidden;
   const wantsGlass = nativeGlassOk && !!look.nativeGlass && !wantsRefract && !aiCard && !themed && !hidden;
   glassInfo.current = { want: wantsGlass, y: offsetY, key: `${wantsGlass}:${vw}:${offsetY}` };
 

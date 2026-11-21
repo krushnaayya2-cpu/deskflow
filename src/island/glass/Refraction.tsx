@@ -101,7 +101,7 @@ void main() {
   // contrast. One cheap probe decides it per pixel, so a dark background
   // stays sharp and glassy while a white headline behind dissolves.
   float probe = dot(sampleAt(p + push, halfSize), vec3(0.299, 0.587, 0.114));
-  float radius = mix(uBlur, 0.8, pow(bevel, 0.75)) * (1.0 + 0.95 * smoothstep(0.45, 0.95, probe));
+  float radius = mix(uBlur, 0.8, pow(bevel, 0.75)) * (1.0 + 1.9 * smoothstep(0.32, 0.9, probe));
   vec3 col = discSample(p + push, radius, halfSize);
 
   // Chromatic aberration as a fixed distance, not a fraction of the push,
@@ -136,11 +136,14 @@ void main() {
   // fading elsewhere, which is how a curved bevel catches light.
   vec2 L = normalize(vec2(-0.6, 0.8));
   vec2 L2 = normalize(vec2(0.62, -0.78));
-  float spec = pow(max(dot(n, L), 0.0), 2.6) * pow(bevel, 1.05);
-  float spec2 = pow(max(dot(n, L2), 0.0), 3.0) * pow(bevel, 1.1);
+  // Tight lobes on a narrow band of the rim: spread across the body this
+  // became a flat pale patch that broke the lens illusion.
+  float sliver = smoothstep(0.35, 0.95, bevel) * pow(bevel, 2.2);
+  float spec = pow(max(dot(n, L), 0.0), 5.0) * sliver;
+  float spec2 = pow(max(dot(n, L2), 0.0), 5.5) * sliver;
   float facing = max(pow(max(dot(n, L), 0.0), 3.2), pow(max(dot(n, L2), 0.0), 3.2));
   float rim = pow(bevel, 4.5) * (0.06 + 0.94 * facing);
-  col += vec3(spec * 0.5 + spec2 * 0.34 + rim * 0.56);
+  col += vec3(spec * 0.46 + spec2 * 0.3 + rim * 0.5);
 
   col = mix(col, col * 0.55, uTint);
 
