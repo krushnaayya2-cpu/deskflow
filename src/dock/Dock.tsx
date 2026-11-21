@@ -28,6 +28,7 @@ import { dockLook, itemStyle } from "./designs";
 import { getSnapshot, onState, type SystemState } from "../lib/island";
 import type { IconStyle } from "../lib/config";
 import { getTasks, onTasks } from "../lib/ai";
+import { Refraction } from "../island/glass/Refraction";
 
 type Item =
   | { kind: "start"; id: string }
@@ -68,6 +69,7 @@ export default function Dock() {
   const [sys, setSys] = useState<SystemState>({ media: null, battery: null, network: null });
   const cfgRef = useRef<Config | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
+  const [refractOk, setRefractOk] = useState(true);
 
   useEffect(() => {
     const busy = (ts: { status: string }[]) => setAiBusy(ts.some((t) => t.status === "running" || t.status === "permission"));
@@ -325,6 +327,7 @@ export default function Dock() {
 
   // Real blur behind the bar (backend decides if the design wants it).
   const radius = look?.radius ?? 0;
+  const refract = !!look?.barClass?.includes("lg-prism") && !!config?.island.refraction && refractOk && !autoHidden;
   useEffect(() => {
     if (!look) return;
     if (autoHidden || style?.design === "pills") setBar(null, 0).catch(() => {});
@@ -432,7 +435,7 @@ export default function Dock() {
               // own radius; the native glass under it is inset a few px so
               // no square corner can show (see src-tauri/src/glass.rs).
               <m.div
-                className={`absolute ${look.barClass ?? ""}`}
+                className={`absolute ${look.barClass ?? ""} ${refract ? "lg-refract" : ""}`}
                 style={{
                   ...look.bar,
                   borderRadius: look.edge
@@ -442,7 +445,25 @@ export default function Dock() {
                 initial={false}
                 animate={{ left: grownBar.x, top: grownBar.y, width: grownBar.w, height: grownBar.h }}
                 transition={{ type: "spring", stiffness: 500, damping: 30 }}
-              />
+              >
+                {/* Same refractive glass as the island, so the whole UI
+                    matches. Falls back to the CSS skin if it can't run. */}
+                {refract && (
+                  <>
+                    <Refraction
+                      w={grownBar.w}
+                      h={grownBar.h}
+                      radius={radius}
+                      x={grownBar.x}
+                      y={grownBar.y}
+                      active={hovered}
+                      onUnsupported={() => setRefractOk(false)}
+                    />
+                    <span className="lg-iris" aria-hidden />
+                    <span className="lg-spec" aria-hidden />
+                  </>
+                )}
+              </m.div>
             )}
         {stackRect && (
           <div className="absolute flex items-center justify-center" style={{ ...look.bar, borderRadius: 17, left: stackRect.x, top: stackRect.y, width: stackRect.w, height: stackRect.h }}>

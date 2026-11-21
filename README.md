@@ -78,6 +78,8 @@ Settings → AI Apps. AI tasks and notifications appear in the Dynamic Island in
 
 The island's **Liquid Glass** design bends the screen behind it. The backend grabs the screen rectangle under the window (DeskFlow's own overlays excluded, so the glass never refracts itself), and a small WebGL shader refracts that image through the pill's edge with per-channel dispersion — the rainbow edge — plus specular highlights and a lit rim. The grab is capped at 256 px on its long edge, which is where the frosted blur comes from; it refreshes about 9 times a second while the island is open and once a second while it sits idle, and the shader only draws when something changed.
 
+The dock's Liquid Glass design uses the same shader, so the whole overlay UI matches.
+
 Settings → Dynamic Island → **Refraction** turns it off, falling back to Windows acrylic blur plus the CSS glass skin. While refraction is on, the island is left out of other apps' screen recordings and screenshots: that is what stops it refracting its own last frame.
 
 ## Design values
