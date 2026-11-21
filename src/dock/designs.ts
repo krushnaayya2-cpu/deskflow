@@ -62,7 +62,7 @@ export function dockLook(design: DockDesign, s: DockStyle, accent: string, dark:
         full: false, align: "center",
         // Colours, highlight, inner glow and gradient border: glass.css.
         bar: { boxShadow: "var(--lg-shadow)" },
-        barClass: "lg-surface",
+        barClass: "lg-surface lg-prism",
         indicator: "dot", pad: 8,
         // Taskbar radius stays in the 20-28px range (default --lg-dock-radius).
         radius: Math.min(Math.max(s.cornerRadius, 20), 28),

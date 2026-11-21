@@ -29,8 +29,9 @@
   --lg-track: rgba(255, 255, 255, 0.18);
   --lg-fallback: rgba(28, 28, 34, 0.92);
 
-  /* Island: darker glass, softer sheen. */
-  --lg-island-bg: rgba(0, 0, 0, 0.55);
+  /* Island: thin, bright glass rather than a dark slab. The acrylic window
+   * underneath supplies the real blur, so this only needs a light tint. */
+  --lg-island-bg: rgba(14, 14, 20, 0.3);
   --lg-island-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 50%);
   --lg-island-fallback: rgba(10, 10, 14, 0.94);
 
@@ -56,8 +57,7 @@
     --lg-btn: rgba(0, 0, 0, 0.07);
     --lg-track: rgba(0, 0, 0, 0.14);
     --lg-fallback: rgba(246, 246, 250, 0.95);
-    /* The island stays dark in light mode (like the iPhone), only lighter. */
-    --lg-island-bg: rgba(0, 0, 0, 0.62);
+    --lg-island-bg: rgba(20, 20, 28, 0.26);
   }
 }
 
@@ -115,5 +115,157 @@ html[data-glass="none"] {
   :root {
     --lg-duration: 0ms;
     --lg-hover-scale: 1;
+  }
+}
+
+/* ---- Prism: the refractive "liquid glass" skin ---------------------------
+ * The look of thick, light-bending glass: a soft rainbow rim (dispersion),
+ * coloured edge bleed inside the shape, a bright top sheen and a moving
+ * specular streak. Composited only (no filters over live content, no screen
+ * capture), so it stays cheap and never appears in screen recordings
+ * differently from the rest of the UI.
+ *
+ * It sits on top of the native acrylic window, so what shows through is the
+ * real blurred desktop; this layer adds the glass itself. */
+:root {
+  --pr-rim: 4px;              /* rainbow rim thickness */
+  --pr-rim-blur: 3px;
+  --pr-rim-opacity: 1;
+  --pr-glow-blur: 14px;
+  --pr-glow-opacity: 0.55;
+  --pr-bleed: 0.5;            /* coloured dispersion inside the edge */
+  --pr-sheen: 0.85;           /* top highlight strength */
+  --pr-spin: 14s;             /* hue travel around the rim */
+  --pr-hue-a: #ff2d95;
+  --pr-hue-b: #ffd84d;
+  --pr-hue-c: #35ffd0;
+  --pr-hue-d: #3f8cff;
+  --pr-hue-e: #b84dff;
+}
+
+@layer components {
+  .lg-prism {
+    position: relative;
+    /* Thick-glass body: bright top edge, soft inner glow, and warm/cool
+     * bleed on opposite sides, which is what dispersion looks like. */
+    box-shadow:
+      /* glass thickness: a crisp lit edge, brightest at the top */
+      inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+      inset 0 1.5px 0 rgba(255, 255, 255, 0.8),
+      inset 0 -1.5px 0 rgba(255, 255, 255, 0.28),
+      inset 0 0 18px -6px rgba(255, 255, 255, 0.3),
+      /* dispersion: cool on one edge, warm on the other */
+      inset 10px 0 14px -11px rgba(63, 140, 255, var(--pr-bleed)),
+      inset -10px 0 14px -11px rgba(255, 45, 149, var(--pr-bleed)),
+      inset 0 -9px 14px -12px rgba(53, 255, 208, calc(var(--pr-bleed) * 0.8)),
+      inset 0 8px 14px -13px rgba(255, 216, 77, calc(var(--pr-bleed) * 0.6));
+  }
+
+  /* Rainbow rim + outer glow. Two rings: a tight bright one and a wider
+   * blurred one. `mask-composite: exclude` leaves only the border band, so
+   * it follows any radius the island morphs to. */
+  .lg-prism > .lg-iris {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+  .lg-prism > .lg-iris::before,
+  .lg-prism > .lg-iris::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: conic-gradient(
+      from var(--pr-angle, 210deg),
+      var(--pr-hue-a),
+      var(--pr-hue-b) 18%,
+      var(--pr-hue-c) 38%,
+      var(--pr-hue-d) 58%,
+      var(--pr-hue-e) 78%,
+      var(--pr-hue-a)
+    );
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    mix-blend-mode: screen;
+  }
+  .lg-prism > .lg-iris::before {
+    padding: var(--pr-rim);
+    filter: blur(var(--pr-rim-blur)) saturate(170%);
+    opacity: var(--pr-rim-opacity);
+    z-index: 2;
+  }
+  /* The glow ring sits just outside the shape: blurred on the inside it
+   * washed over the content and hurt legibility. */
+  .lg-prism > .lg-iris::after {
+    inset: -5px;
+    padding: calc(var(--pr-rim) * 2.2);
+    filter: blur(var(--pr-glow-blur)) saturate(140%);
+    opacity: var(--pr-glow-opacity);
+    z-index: 1;
+  }
+
+  /* Specular: a fixed top sheen plus a slow streak travelling across the
+   * glass. Both are plain gradients, so they cost nothing to animate. */
+  .lg-prism > .lg-spec {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 3;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, calc(var(--pr-sheen) * 0.38)), rgba(255, 255, 255, 0) 38%),
+      radial-gradient(90% 60% at 28% -20%, rgba(255, 255, 255, calc(var(--pr-sheen) * 0.5)), rgba(255, 255, 255, 0) 62%),
+      radial-gradient(70% 50% at 82% 112%, rgba(255, 255, 255, calc(var(--pr-sheen) * 0.22)), rgba(255, 255, 255, 0) 60%);
+  }
+  .lg-prism > .lg-spec::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, 0.22) 48%, rgba(255, 255, 255, 0.05) 54%, transparent 62%);
+    transform: translateX(-35%);
+    animation: lg-streak 7s ease-in-out infinite;
+  }
+}
+
+@property --pr-angle {
+  syntax: "<angle>";
+  initial-value: 210deg;
+  inherits: true;
+}
+
+.lg-prism > .lg-iris {
+  animation: lg-spin var(--pr-spin) linear infinite;
+}
+@keyframes lg-spin {
+  to {
+    --pr-angle: 570deg;
+  }
+}
+@keyframes lg-streak {
+  0%, 62% {
+    transform: translateX(-38%);
+  }
+  88%, 100% {
+    transform: translateX(38%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lg-prism > .lg-iris,
+  .lg-prism > .lg-spec::after {
+    animation: none;
+  }
+}
+
+/* Light mode: a brighter body and a gentler rim. */
+@media (prefers-color-scheme: light) {
+  :root {
+    --pr-rim-opacity: 0.6;
+    --pr-glow-opacity: 0.28;
+    --pr-bleed: 0.2;
   }
 }

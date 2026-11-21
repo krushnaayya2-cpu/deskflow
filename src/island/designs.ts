@@ -12,6 +12,8 @@ export interface DesignLook {
   surfaceClass?: string;
   /** Put real (native acrylic) blur behind the pill. */
   nativeGlass?: boolean;
+  /** Refractive skin: rainbow rim, dispersion and specular layers. */
+  prism?: boolean;
   /** Shadow at rest and while a notification is blooming. */
   shadow: string;
   glow: (accent: string) => string;
@@ -40,7 +42,8 @@ export const DESIGNS: Record<IslandDesign, { label: string; description: string;
     look: () => ({
       // Colours live in src/styles/glass.css (.lg-surface.lg-island).
       surface: {},
-      surfaceClass: "lg-surface lg-island",
+      surfaceClass: "lg-surface lg-island lg-prism",
+      prism: true,
       nativeGlass: true,
       shadow: "var(--lg-shadow)",
       glow: (a) => `0 0 0 1px ${a}77, 0 8px 32px ${a}44, 0 8px 32px rgba(0,0,0,0.25)`,

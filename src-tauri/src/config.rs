@@ -126,6 +126,10 @@ pub struct IslandConfig {
     pub size: IslandSize,
     /// Island size in percent (60–170).
     pub scale: u32,
+    /// Bend the screen behind the island through the glass (Liquid Glass).
+    /// Needs the window to be hidden from screen capture, so it is a
+    /// setting of its own.
+    pub refraction: bool,
     pub style: IslandStyle,
     /// Gap between the top of the screen and the island, in pixels.
     pub offset_y: u32,
@@ -145,6 +149,7 @@ impl Default for IslandConfig {
             monitor: IslandMonitor::Primary,
             size: IslandSize::Medium,
             scale: 100,
+            refraction: true,
             style: IslandStyle::Liquid,
             offset_y: 8,
             hide_when_idle: false,

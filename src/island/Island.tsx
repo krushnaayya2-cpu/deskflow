@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { diag } from "../lib/diag";
 import { getTasks, onNotify, onTasks, type AiNotification, type AiTask } from "../lib/ai";
 import { aiLook, COMPLETED_MS, noteLook, pickTask } from "./ai/AiViews";
+import { Refraction } from "./glass/Refraction";
 import { AnimatePresence, LazyMotion, domAnimation, m, type TargetAndTransition } from "framer-motion";
 import { getConfig, onConfigChanged, type Config } from "../lib/config";
 import {
@@ -107,6 +108,7 @@ export default function Island() {
   // display changes, and the hit area must be re-centred with it.
   const [vw, setVw] = useState(window.innerWidth);
   const [nativeGlassOk, setNativeGlassOk] = useState(false);
+  const [refractOk, setRefractOk] = useState(true);
   const pillRef = useRef<HTMLDivElement>(null);
 
   // ---- Data subscriptions ------------------------------------------------
@@ -364,7 +366,11 @@ export default function Island() {
   const rBottom = aiCard ? shape.r * s : h <= 110 * s ? h / 2 : shape.r * s;
   const rTop = notch ? 0 : rBottom;
   const liquid = !aiCard && !themed && !!look.surfaceClass;
-  const wantsGlass = nativeGlassOk && !!look.nativeGlass && !aiCard && !themed && !hidden;
+  // Refraction replaces the acrylic for the Liquid Glass design: it draws
+  // the blurred, bent background itself, so a second blurred layer beneath
+  // would only wash it out.
+  const wantsRefract = !!look.prism && !!config.island.refraction && refractOk && !aiCard && !themed && !hidden;
+  const wantsGlass = nativeGlassOk && !!look.nativeGlass && !wantsRefract && !aiCard && !themed && !hidden;
   glassInfo.current = { want: wantsGlass, y: offsetY, key: `${wantsGlass}:${vw}:${offsetY}` };
 
   return (
@@ -411,7 +417,7 @@ export default function Island() {
           onPointerLeave={() => window.clearTimeout(pressTimer.current)}
         >
           <div
-            className={`absolute inset-0 ${liquid ? look.surfaceClass : ""} ${aiCard || themed || mode === "idle" || mode === "compact" ? "" : look.className ?? ""}`}
+            className={`absolute inset-0 ${liquid ? look.surfaceClass : ""} ${wantsRefract ? "lg-refract" : ""} ${aiCard || themed || mode === "idle" || mode === "compact" ? "" : look.className ?? ""}`}
             style={{
               ...surface,
               borderRadius: "inherit",
@@ -419,6 +425,25 @@ export default function Island() {
               clipPath: aiCard?.bare ? undefined : "inset(0 round var(--isl-rt) var(--isl-rt) var(--isl-rb) var(--isl-rb))",
             }}
           >
+          {/* Refractive glass layers: rainbow rim and specular. They sit
+              under the content and never take pointer events. */}
+          {wantsRefract && (
+            <Refraction
+              w={w}
+              h={h}
+              radius={rBottom}
+              x={(vw - w) / 2}
+              y={offsetY}
+              active={mode !== "idle" && mode !== "compact"}
+              onUnsupported={() => setRefractOk(false)}
+            />
+          )}
+          {liquid && look.prism && (
+            <>
+              <span className="lg-iris" aria-hidden />
+              <span className="lg-spec" aria-hidden />
+            </>
+          )}
           {themed && mode !== "compact" && <Decoration theme={mTheme} s={s} />}
           <AnimatePresence mode="popLayout" initial={false}>
             <m.div

@@ -74,6 +74,12 @@ Settings → AI Apps. AI tasks and notifications appear in the Dynamic Island in
 - **Dock:** AI apps found on your PC get their own section with a gradient ring that spins while a task runs.
 - Do not disturb, sound, and a history of recent notifications and tasks.
 
+## Liquid Glass
+
+The island's **Liquid Glass** design bends the screen behind it. The backend grabs the screen rectangle under the window (DeskFlow's own overlays excluded, so the glass never refracts itself), and a small WebGL shader refracts that image through the pill's edge with per-channel dispersion — the rainbow edge — plus specular highlights and a lit rim. The grab is capped at 256 px on its long edge, which is where the frosted blur comes from; it refreshes about 9 times a second while the island is open and once a second while it sits idle, and the shader only draws when something changed.
+
+Settings → Dynamic Island → **Refraction** turns it off, falling back to Windows acrylic blur plus the CSS glass skin. While refraction is on, the island is left out of other apps' screen recordings and screenshots: that is what stops it refracting its own last frame.
+
 ## Design values
 
 All glass values (tint, border, highlight, shadow, radius, motion curve, hover scale, light-mode variants and the no-blur fallback) are CSS variables in `src/styles/glass.css`. Real blur comes from a native acrylic window under the island and the dock (`src-tauri/src/glass.rs`), because CSS `backdrop-filter` can't see the desktop from a transparent window.

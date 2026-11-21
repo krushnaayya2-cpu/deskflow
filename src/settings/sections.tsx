@@ -159,6 +159,12 @@ export function IslandSection({ config, update }: SectionProps) {
         </Row>
         <DesignPicker value={isl.style} accent={config.appearance.accent} onChange={(v) => set({ style: v }, true)} />
         <MusicThemePicker value={isl.musicTheme} onChange={(v) => set({ musicTheme: v }, true)} />
+        <Row
+          label="Refraction"
+          description="Liquid Glass bends the screen behind the island, with a rainbow edge. While this is on the island is left out of screen recordings and screenshots, so it can't refract itself."
+          htmlFor="island-refract">
+          <Toggle id="island-refract" label="Refraction" checked={isl.refraction} onChange={(v) => set({ refraction: v })} />
+        </Row>
         <Row label="Audio-reactive visualizer" description="Animated bars and waves that move with your PC's sound." htmlFor="island-viz">
           <Toggle id="island-viz" label="Audio-reactive visualizer" checked={isl.visualizer} onChange={(v) => set({ visualizer: v })} />
         </Row>

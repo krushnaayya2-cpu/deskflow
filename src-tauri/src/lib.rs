@@ -6,6 +6,7 @@
 
 mod ai;
 mod commands;
+mod capture;
 mod config;
 mod diag;
 mod displays;
@@ -74,6 +75,8 @@ pub fn run() {
             island::island_snapshot,
             island::island_set_glass,
             glass::glass_supported,
+            capture::capture_behind,
+            capture::set_capture_excluded,
             island::island_demo,
             island::media_control,
             island::media_art,

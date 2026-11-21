@@ -14,6 +14,8 @@ export interface IslandConfig {
   size: "small" | "medium" | "large";
   /** Island size in percent (60–170). */
   scale: number;
+  /** Bend the screen behind the island through the glass. */
+  refraction: boolean;
   style: IslandDesign;
   offsetY: number;
   hideWhenIdle: boolean;
