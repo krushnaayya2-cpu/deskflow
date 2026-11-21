@@ -282,17 +282,30 @@ export default function Island() {
   }, [w, h, offsetY, vw]);
 
   // ---- Click vs long-press -----------------------------------------------
+  // Fix (pressing pause collapsed the island): a press that lands on a
+  // control — play/pause, next, seek, volume, Open — must never also toggle
+  // the island. Children stop propagation, but this check does not depend on
+  // that: any control, now or later, is honoured by its tag/role alone.
+  const onControl = (e: React.PointerEvent) =>
+    !!(e.target as Element | null)?.closest?.('button, a, input, [role="slider"], [data-control]');
   const pressTimer = useRef<number | undefined>(undefined);
   const longPressed = useRef(false);
-  const onPointerDown = () => {
+  const ignorePress = useRef(false);
+  const onPointerDown = (e: React.PointerEvent) => {
+    ignorePress.current = onControl(e);
+    if (ignorePress.current) return;
     longPressed.current = false;
     pressTimer.current = window.setTimeout(() => {
       longPressed.current = true;
       setPinned("actions");
     }, LONG_PRESS_MS);
   };
-  const onPointerUp = () => {
+  const onPointerUp = (e: React.PointerEvent) => {
     window.clearTimeout(pressTimer.current);
+    if (ignorePress.current || onControl(e)) {
+      ignorePress.current = false;
+      return;
+    }
     if (!longPressed.current) setPinned((p) => (p ? null : aiCard ? null : "details"));
   };
 
@@ -308,7 +321,13 @@ export default function Island() {
   const glassRaf = useRef(0);
   const glassInfo = useRef({ want: false, y: 0, key: "" });
   const lastGlassKey = useRef("");
+  const sentGlass = useRef({ w: 0, h: 0, r: 0 });
   const reportGlass = useCallback((gw: number, gh: number, gr: number) => {
+    // Only when it actually moved: during a morph this is called every
+    // frame, and each call is an IPC round trip plus a Win32 window move.
+    const p = sentGlass.current;
+    if (Math.abs(p.w - gw) < 2 && Math.abs(p.h - gh) < 2 && Math.abs(p.r - gr) < 2) return;
+    sentGlass.current = { w: gw, h: gh, r: gr };
     cancelAnimationFrame(glassRaf.current);
     glassRaf.current = requestAnimationFrame(() => {
       if (!glassInfo.current.want) return;
@@ -382,7 +401,11 @@ export default function Island() {
             const vh2 = Number.parseFloat(String(v.height ?? h));
             reportGlass(vw2, vh2, Number.parseFloat(String(v["--isl-rb"] ?? rBottom)));
           }}
-          onAnimationComplete={() => wantsGlass && reportGlass(w, h, rBottom)}
+          onAnimationComplete={() => {
+            if (!wantsGlass) return;
+            sentGlass.current = { w: 0, h: 0, r: 0 };
+            reportGlass(w, h, rBottom);
+          }}
           onPointerDown={onPointerDown}
           onPointerUp={onPointerUp}
           onPointerLeave={() => window.clearTimeout(pressTimer.current)}
@@ -444,6 +467,10 @@ export default function Island() {
 const stop = { onPointerDown: (e: React.PointerEvent) => e.stopPropagation(), onPointerUp: (e: React.PointerEvent) => e.stopPropagation() };
 
 function Btn(props: { label: string; onClick: () => void; children: ReactNode; s: number; primary?: boolean; accent?: string }) {
+  // Controls follow the island's size but never shrink below 90%: at the
+  // smallest island sizes the buttons were too small to hit. `isl-hit` adds
+  // a few px of invisible hit area around each one.
+  const s = Math.max(props.s, 0.9);
   return (
     <button
       type="button"
@@ -451,11 +478,11 @@ function Btn(props: { label: string; onClick: () => void; children: ReactNode; s
       title={props.label}
       {...stop}
       onClick={props.onClick}
-      className="flex items-center justify-center gap-1.5 rounded-full transition-transform hover:scale-110 active:scale-95"
+      className="isl-hit flex items-center justify-center gap-1.5 rounded-full transition-transform hover:scale-110 active:scale-95"
       style={{
-        height: 30 * props.s,
-        minWidth: 30 * props.s,
-        padding: `0 ${10 * props.s}px`,
+        height: 30 * s,
+        minWidth: 30 * s,
+        padding: `0 ${10 * s}px`,
         background: props.primary ? props.accent : "var(--isl-btn)",
         color: props.primary ? "#fff" : undefined,
       }}

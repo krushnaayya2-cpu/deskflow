@@ -65,3 +65,16 @@ button:focus-visible {
   .music-rain, .music-sheen, .music-orbit-dot { animation: none; }
 }
 
+
+/* Invisible hit padding: island controls stay easy to click at small island
+ * sizes, where a missed press used to collapse the island instead. */
+.isl-hit {
+  position: relative;
+  touch-action: none;
+}
+.isl-hit::before {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: inherit;
+}

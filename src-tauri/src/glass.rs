@@ -14,7 +14,10 @@
 
 #[cfg(windows)]
 mod imp {
-    use std::sync::Once;
+    use std::{
+        collections::BTreeMap,
+        sync::{Mutex, Once},
+    };
     use windows::{
         core::{s, w, BOOL, PCWSTR},
         Win32::{
@@ -23,7 +26,7 @@ mod imp {
             System::LibraryLoader::{GetModuleHandleW, GetProcAddress},
             UI::WindowsAndMessaging::{
                 CreateWindowExW, DefWindowProcW, DestroyWindow, RegisterClassExW, SetWindowPos, ShowWindow,
-                MA_NOACTIVATE, SWP_NOACTIVATE, SWP_SHOWWINDOW, SW_HIDE, WM_MOUSEACTIVATE, WNDCLASSEXW,
+                MA_NOACTIVATE, SWP_NOACTIVATE, SWP_NOZORDER, SWP_SHOWWINDOW, SW_HIDE, WM_MOUSEACTIVATE, WNDCLASSEXW,
                 WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
             },
         },
@@ -117,6 +120,16 @@ mod imp {
     /// Place the glass at (x, y, w, h) in physical pixels, rounded, tinted,
     /// directly beneath `above` (the webview window it backs). The region is
     /// inset by `inset` px so no aliased corner pixel shows (see module docs).
+    /// What each glass window was last shown with, so repeated calls with
+    /// the same values do nothing.
+    ///
+    /// Performance: the island reports its shape while it morphs, so `show`
+    /// can be called many times a second. Re-applying the acrylic policy,
+    /// rebuilding the region or re-stacking the window on every call cost
+    /// DWM work and made the island stutter, so each of those now happens
+    /// only when the value it depends on actually changes.
+    static SHOWN: Mutex<BTreeMap<isize, (i32, i32, i32, i32, i32, (u8, u8, u8, u8))>> = Mutex::new(BTreeMap::new());
+
     #[allow(clippy::too_many_arguments)]
     pub fn show(hwnd: isize, above: isize, x: i32, y: i32, w: i32, h: i32, radius: i32, inset: i32, tint: (u8, u8, u8, u8)) {
         let me = HWND(hwnd as _);
@@ -127,11 +140,30 @@ mod imp {
         if w <= 0 || h <= 0 {
             return hide(hwnd);
         }
+        let (x, y) = (x + i, y + i);
+        let mut shown = SHOWN.lock().unwrap();
+        let last = shown.insert(hwnd, (x, y, w, h, r, tint));
+        let first = last.is_none();
+        let last = last.unwrap_or((i32::MIN, 0, 0, 0, 0, (0, 0, 0, 0)));
+        if last == (x, y, w, h, r, tint) {
+            return;
+        }
         unsafe {
-            set_acrylic(me, tint);
-            let rgn = CreateRoundRectRgn(0, 0, w + 1, h + 1, r * 2, r * 2);
-            SetWindowRgn(me, Some(rgn), true);
-            let _ = SetWindowPos(me, Some(HWND(above as _)), x + i, y + i, w, h, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+            if first || last.5 != tint {
+                set_acrylic(me, tint);
+            }
+            if first || (last.2, last.3, last.4) != (w, h, r) {
+                let rgn = CreateRoundRectRgn(0, 0, w + 1, h + 1, r * 2, r * 2);
+                SetWindowRgn(me, Some(rgn), true);
+            }
+            // Only re-stack under the webview the first time: repeating it
+            // churns the z-order under the cursor on every frame.
+            let mut flags = SWP_NOACTIVATE | SWP_SHOWWINDOW;
+            if !first {
+                flags |= SWP_NOZORDER;
+            }
+            let after = if first { Some(HWND(above as _)) } else { None };
+            let _ = SetWindowPos(me, after, x, y, w, h, flags);
         }
     }
 
@@ -148,12 +180,14 @@ mod imp {
     }
 
     pub fn hide(hwnd: isize) {
+        SHOWN.lock().unwrap().remove(&hwnd);
         unsafe {
             let _ = ShowWindow(HWND(hwnd as _), SW_HIDE);
         }
     }
 
     pub fn destroy(hwnd: isize) {
+        SHOWN.lock().unwrap().remove(&hwnd);
         unsafe {
             let _ = DestroyWindow(HWND(hwnd as _));
         }

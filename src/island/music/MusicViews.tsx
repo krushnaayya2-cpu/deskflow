@@ -33,7 +33,10 @@ function Art({ art, theme, size, radius }: { art: string | null; theme: MusicThe
 
 function Btn(props: { t: MusicTheme; size: number; label: string; onClick: () => void; children: ReactNode; primary?: boolean; active?: boolean }) {
   const { t } = props;
-  const base: CSSProperties = { width: props.size, height: props.size, borderRadius: props.size, color: props.active ? t.colors[1] : undefined };
+  // Never smaller than 26px: at the smallest island sizes these were too
+  // small to hit, and a missed press used to collapse the island.
+  const size = Math.max(props.size, 26);
+  const base: CSSProperties = { width: size, height: size, borderRadius: size, color: props.active ? t.colors[1] : undefined };
   let look: CSSProperties = {};
   if (props.primary) {
     look =
@@ -48,8 +51,8 @@ function Btn(props: { t: MusicTheme; size: number; label: string; onClick: () =>
     look = { background: t.light ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.06)" };
   }
   return (
-    <button type="button" aria-label={props.label} title={props.label} {...stop} onClick={props.onClick}
-      className="flex shrink-0 items-center justify-center transition-transform hover:scale-110 active:scale-95"
+    <button type="button" aria-label={props.label} title={props.label} {...stop} onClick={props.onClick} data-control
+      className="isl-hit flex shrink-0 items-center justify-center transition-transform hover:scale-110 active:scale-95"
       style={{ ...base, ...look }}>
       {props.children}
     </button>

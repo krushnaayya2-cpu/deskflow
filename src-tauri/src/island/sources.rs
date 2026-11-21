@@ -379,7 +379,49 @@ mod platform {
             }
             other => return Err(format!("Unknown media action {other:?}")),
         };
-        op.and_then(|o| o.join()).map(|_| ()).map_err(|e| e.to_string())
+        // GSMTC returns false when the player accepts the session but
+        // refuses the command (several players, Spotify included, do this
+        // for play/pause and skip). Fall back to the keyboard's media keys,
+        // which every player that registers a media session responds to.
+        match op.and_then(|o| o.join()) {
+            Ok(true) => Ok(()),
+            Ok(false) => {
+                crate::diag::trace(&format!("media {action}: session refused, using media keys"));
+                media_key(action)
+            }
+            Err(e) => {
+                crate::diag::trace(&format!("media {action} failed: {e}"));
+                media_key(action).map_err(|_| e.to_string())
+            }
+        }
+    }
+
+    /// Press the keyboard's media key for this action (fallback path).
+    fn media_key(action: &str) -> Result<(), String> {
+        use windows::Win32::UI::Input::KeyboardAndMouse::{
+            SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VIRTUAL_KEY, VK_MEDIA_NEXT_TRACK,
+            VK_MEDIA_PLAY_PAUSE, VK_MEDIA_PREV_TRACK,
+        };
+        let key = match action {
+            "toggle" => VK_MEDIA_PLAY_PAUSE,
+            "next" => VK_MEDIA_NEXT_TRACK,
+            "prev" => VK_MEDIA_PREV_TRACK,
+            // Shuffle, repeat and seek have no media key.
+            other => return Err(format!("{other} is not supported by this player")),
+        };
+        let input = |flags| INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT { wVk: VIRTUAL_KEY(key.0), dwFlags: flags, ..Default::default() },
+            },
+        };
+        let events = [input(Default::default()), input(KEYEVENTF_KEYUP)];
+        let sent = unsafe { SendInput(&events, std::mem::size_of::<INPUT>() as i32) };
+        if sent as usize == events.len() {
+            Ok(())
+        } else {
+            Err("Couldn't reach the media player".into())
+        }
     }
 }
 
