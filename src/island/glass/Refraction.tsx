@@ -86,9 +86,9 @@ void main() {
   // Displacement profile: flat through the middle, rising into the rim.
   // A wider exponent than before spreads the bend across more of the rim
   // band, so the curve is visible rather than hugging the last few pixels.
-  float lens = pow(bevel, 1.6);
+  float lens = pow(bevel, 1.45);
   // Band the colour split lives in, so fringing never reaches the centre.
-  float band = smoothstep(0.08, 0.8, bevel);
+  float band = smoothstep(0.18, 0.85, bevel);
 
   // Refraction: the view is pushed outwards along the surface normal, so
   // what is behind stretches towards the rim and squeezes into the edge.
@@ -102,7 +102,7 @@ void main() {
 
   // Chromatic aberration as a fixed distance, not a fraction of the push,
   // and faded out towards the centre so only the rim carries rainbow edges.
-  vec2 split = n * uChroma * band;
+  vec2 split = n * uChroma * pow(band, 1.8);
   if (band > 0.004) {
     float rs = max(0.8, radius * 0.3);
     col.r = mix(col.r, discSample(p + push + split, rs, halfSize).r, band);
@@ -132,11 +132,11 @@ void main() {
   // fading elsewhere, which is how a curved bevel catches light.
   vec2 L = normalize(vec2(-0.6, 0.8));
   vec2 L2 = normalize(vec2(0.62, -0.78));
-  float spec = pow(max(dot(n, L), 0.0), 3.0) * pow(bevel, 1.1);
-  float spec2 = pow(max(dot(n, L2), 0.0), 3.6) * pow(bevel, 1.2);
-  float facing = max(pow(max(dot(n, L), 0.0), 2.2), pow(max(dot(n, L2), 0.0), 2.2));
-  float rim = pow(bevel, 5.0) * (0.12 + 0.88 * facing);
-  col += vec3(spec * 0.5 + spec2 * 0.34 + rim * 0.6);
+  float spec = pow(max(dot(n, L), 0.0), 2.6) * pow(bevel, 1.05);
+  float spec2 = pow(max(dot(n, L2), 0.0), 3.0) * pow(bevel, 1.1);
+  float facing = max(pow(max(dot(n, L), 0.0), 3.2), pow(max(dot(n, L2), 0.0), 3.2));
+  float rim = pow(bevel, 4.5) * (0.06 + 0.94 * facing);
+  col += vec3(spec * 0.62 + spec2 * 0.42 + rim * 0.7);
 
   col = mix(col, col * 0.55, uTint);
 
@@ -228,7 +228,7 @@ export function Refraction({ w, h, radius, x, y, active, onUnsupported }: Refrac
     const u = (n: string) => gl.getUniformLocation(prog, n);
     const uWin = u("uWin"), uPill = u("uPill"), uPillPos = u("uPillPos"), uRadius = u("uRadius");
     const uEdge = u("uEdge"), uBend = u("uBend"), uTime = u("uTime"), uFlow = u("uFlow"), uBlur = u("uBlur");
-    gl.uniform1f(u("uChroma"), 3.0);   // px between R and B at the rim
+    gl.uniform1f(u("uChroma"), 1.8);   // px between R and B at the rim
     gl.uniform1f(u("uTint"), 0.14);
     gl.uniform1f(u("uIris"), 0.4);
     gl.enable(gl.BLEND);
@@ -309,11 +309,13 @@ export function Refraction({ w, h, radius, x, y, active, onUnsupported }: Refrac
       // bend is large because the profile concentrates it at the rim.
       // A wider rim band, and a strong enough push inside it to visibly
       // curve the background into the edge.
-      const edge = Math.max(18, Math.min(g.h * 0.62, 54));
+      // Wider rim band and a harder push inside it: that is the lens. The
+      // centre stays only lightly hazed (6-8px) so it reads as clear glass
+      // rather than as a blurred panel.
+      const edge = Math.max(20, Math.min(g.h * 0.68, 60));
       gl.uniform1f(uEdge, edge);
-      gl.uniform1f(uBend, Math.min(Math.max(edge * 2.0, 38), 72));
-      // Frost scales with the pill: enough to dissolve big shapes behind.
-      gl.uniform1f(uBlur, Math.max(6, Math.min(g.h * 0.22, 13)));
+      gl.uniform1f(uBend, Math.min(Math.max(edge * 2.3, 44), 86));
+      gl.uniform1f(uBlur, Math.max(6, Math.min(g.h * 0.13, 8)));
       // The flow scales with the pill so a small pill ripples less.
       gl.uniform1f(uFlow, 0);
       gl.uniform1f(uTime, (performance.now() - start) / 1000);

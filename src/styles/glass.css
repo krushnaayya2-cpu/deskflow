@@ -182,7 +182,11 @@ html[data-glass="none"] {
     /* The glass is frosted through the middle now, so this only has to
      * steady the text: a faint pool behind the text block, nothing over the
      * rest of the pill. */
-    background: radial-gradient(58% 140% at 26% 50%, rgba(8, 8, 14, 0.26) 0%, rgba(8, 8, 14, 0.14) 48%, rgba(8, 8, 14, 0) 76%);
+    background:
+      /* steadies the start of the text, where a bright shape behind is
+       * most likely to run through the first word */
+      radial-gradient(36% 125% at 20% 50%, rgba(8, 8, 14, 0.36) 0%, rgba(8, 8, 14, 0) 72%),
+      radial-gradient(58% 140% at 28% 50%, rgba(8, 8, 14, 0.24) 0%, rgba(8, 8, 14, 0.13) 48%, rgba(8, 8, 14, 0) 76%);
   }
   .isl-sub {
     color: rgba(255, 255, 255, 0.93);
