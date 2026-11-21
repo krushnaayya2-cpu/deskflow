@@ -64,28 +64,49 @@ void main() {
 
   // 0 deep inside the glass, 1 right at the rim: the bevel.
   float bevel = 1.0 - clamp(-d / uEdge, 0.0, 1.0);
-  float lens = pow(bevel, 1.7);
+  float lens = pow(bevel, 1.45);
+
+  // Liquid wobble: the edge thickness breathes a little, so the glass looks
+  // poured rather than stamped.
+  float wob = 1.0 + 0.16 * sin(d * 0.08 + uTime * 0.9 + (p.x + p.y) * 0.012);
 
   // Refraction: the body magnifies slightly, like a thick lens, and near
   // the rim the view is pushed outwards, so the background squeezes and
   // stretches exactly as it does through a glass edge.
-  vec2 base = p * 0.94;
-  vec2 push = n * uBend * lens;
+  vec2 base = p * 0.9;
+  vec2 push = n * uBend * lens * wob;
   vec3 col;
   col.r = sampleAt(base + push * (1.0 + uChroma), halfSize).r;
   col.g = sampleAt(base + push, halfSize).g;
   col.b = sampleAt(base + push * (1.0 - uChroma), halfSize).b;
 
-  // Thin oil-slick band following the edge: the rainbow in the reference.
-  float ang = atan(n.y, n.x) / 6.2831853;
-  vec3 iris = 0.5 + 0.5 * cos(6.2831853 * (vec3(0.0, 0.33, 0.67) + ang + uTime * 0.02));
-  col += iris * pow(bevel, 2.2) * uIris;
+  // A second, wider tap set pulls light in from further out, which is what
+  // makes a thick edge glow instead of just bending.
+  vec3 wide;
+  wide.r = sampleAt(base + push * (2.1 + uChroma), halfSize).r;
+  wide.g = sampleAt(base + push * 2.1, halfSize).g;
+  wide.b = sampleAt(base + push * (2.1 - uChroma), halfSize).b;
+  col = mix(col, wide, pow(bevel, 1.8) * 0.38);
 
-  // Specular: a light from the top-left, plus a bright rim.
+  // Oil-slick iridescence: a broad band following the edge, its hue set by
+  // the surface angle and how deep into the bevel the pixel sits.
+  float ang = atan(n.y, n.x) / 6.2831853;
+  float depth = pow(bevel, 1.7);
+  vec3 iris = 0.5 + 0.5 * cos(6.2831853 * (vec3(0.0, 0.33, 0.67) + ang * 1.3 + depth * 0.8 + uTime * 0.03));
+  col += iris * depth * uIris;
+
+  // Brighter at the rim, calmer in the middle: that reads as thick glass
+  // and keeps the UI text on top legible.
+  col *= mix(0.7, 1.0, pow(bevel, 0.8));
+
+  // Specular: a key light from the top-left and a softer one from below,
+  // plus the bright lit rim that reads as polished glass.
   vec2 L = normalize(vec2(-0.55, 0.83));
-  float spec = pow(max(dot(n, L), 0.0), 7.0) * bevel;
-  float rim = pow(bevel, 3.5);
-  col += vec3(spec * 0.55 + rim * 0.33);
+  vec2 L2 = normalize(vec2(0.6, -0.8));
+  float spec = pow(max(dot(n, L), 0.0), 5.0) * bevel;
+  float spec2 = pow(max(dot(n, L2), 0.0), 9.0) * bevel * 0.5;
+  float rim = pow(bevel, 4.0);
+  col += vec3((spec + spec2) * 0.5 + rim * 0.32);
 
   // A little darker so UI text stays readable over bright wallpapers.
   col = mix(col, col * 0.55, uTint);
@@ -178,7 +199,7 @@ export function Refraction({ w, h, radius, x, y, active, onUnsupported }: Refrac
     const u = (n: string) => gl.getUniformLocation(prog, n);
     const uWin = u("uWin"), uPill = u("uPill"), uPillPos = u("uPillPos"), uRadius = u("uRadius");
     const uEdge = u("uEdge"), uBend = u("uBend"), uTime = u("uTime");
-    gl.uniform1f(u("uChroma"), 0.38);
+    gl.uniform1f(u("uChroma"), 0.55);
     gl.uniform1f(u("uTint"), 0.46);
     gl.uniform1f(u("uIris"), 0.5);
     gl.enable(gl.BLEND);
@@ -255,9 +276,10 @@ export function Refraction({ w, h, radius, x, y, active, onUnsupported }: Refrac
       gl.uniform2f(uPillPos, g.x, g.y);
       gl.uniform1f(uRadius, g.radius);
       // The bevel scales with the pill so small pills do not look chunky.
-      const edge = Math.max(12, Math.min(g.h * 0.45, 34));
+      // A thick glass edge: it is what gives the reference its depth.
+      const edge = Math.max(14, Math.min(g.h * 0.55, 46));
       gl.uniform1f(uEdge, edge);
-      gl.uniform1f(uBend, edge * 1.15);
+      gl.uniform1f(uBend, edge * 1.7);
       gl.uniform1f(uTime, (performance.now() - start) / 1000);
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
