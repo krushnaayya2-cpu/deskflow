@@ -351,3 +351,107 @@ html[data-glass="none"] {
     display: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Layered highlight treatment.
+ *
+ * Adapted from the supplied liquid-glass sheet. Its own note is right and
+ * matches what we found: an overlay window is transparent, so backdrop-filter
+ * and SVG refraction have nothing behind them to work on. Here the refraction
+ * shader supplies the real bending (it samples the screen itself); these
+ * layers supply the material on top of it — directional specular, top sheen,
+ * an accent glow and depth — and are also what carries the look when the
+ * shader is unavailable.
+ * ------------------------------------------------------------------------ */
+
+:root {
+  --glass-shadow: rgb(0 0 0 / 0.38);
+  --glass-ink: #fff;
+}
+
+@layer components {
+  /* Collapsed pill: thin, lit top and bottom edges and one soft drop. */
+  .lg-surface.lg-island.lg-island-pill {
+    box-shadow:
+      inset 0 1px 1px rgb(255 255 255 / 0.55),
+      inset 0 -1px 1px rgb(255 255 255 / 0.22),
+      inset 2px 0 4px -2px rgb(255 255 255 / 0.35),
+      0 4px 14px var(--glass-shadow);
+  }
+
+  /* Expanded panel and the AI notification card: a specular catch at the
+   * top-left and a weaker one at the bottom-right, which is what makes the
+   * edge read as curved rather than as a drawn outline. */
+  .lg-surface.lg-island.lg-island-panel,
+  .lg-surface.lg-ai-card {
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / 0.1),
+      inset 3px 4px 8px -4px rgb(255 255 255 / 0.75),
+      inset -3px -4px 8px -4px rgb(255 255 255 / 0.5),
+      inset 0 0 20px rgb(255 255 255 / 0.08),
+      0 2px 4px rgb(0 0 0 / 0.14),
+      0 12px 32px var(--glass-shadow);
+  }
+
+  /* Sheen and accent glow. Kept out of the refraction path, where the
+   * shader already lights the surface and a second set washed it out. */
+  /* The AI card keeps its own inline background (it carries the gradient
+   * border), so only the panel takes these layers. */
+  .lg-surface.lg-island.lg-island-panel:not(.lg-refract) {
+    background-image:
+      radial-gradient(ellipse at 16% -32%, rgb(255 255 255 / 0.38), transparent 62%),
+      radial-gradient(ellipse at 92% 142%, color-mix(in srgb, var(--accent, #7c5cff) 32%, transparent), transparent 60%);
+    background-blend-mode: screen, normal;
+  }
+  .lg-surface.lg-island.lg-island-panel.lg-refract {
+    /* Only the accent glow survives; the white sheen is the shader's job. */
+    background-image: radial-gradient(ellipse at 92% 142%, color-mix(in srgb, var(--accent, #7c5cff) 22%, transparent), transparent 58%);
+  }
+
+  /* Buttons made of the same material. */
+  .lg-btn {
+    border: 1px solid rgb(255 255 255 / 0.34);
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 0.3), rgb(255 255 255 / 0.04)),
+      color-mix(in srgb, var(--accent, #7c5cff) 34%, transparent);
+    box-shadow:
+      inset 0 1px 1px rgb(255 255 255 / 0.6),
+      inset 0 -1px 2px rgb(0 0 0 / 0.12),
+      0 2px 6px rgb(0 0 0 / 0.12);
+    transition: transform 160ms cubic-bezier(0.32, 0.72, 0, 1), filter 150ms ease;
+  }
+  .lg-btn:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.08);
+  }
+  .lg-btn:active {
+    transform: translateY(0) scale(0.97);
+  }
+  .lg-btn:focus-visible {
+    outline: 2px solid var(--glass-ink);
+    outline-offset: 2px;
+  }
+  /* Neutral buttons (Deny, Dismiss) take the material without the accent. */
+  .lg-btn-plain {
+    background: linear-gradient(180deg, rgb(255 255 255 / 0.22), rgb(255 255 255 / 0.04)), rgb(255 255 255 / 0.08);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .lg-island-panel,
+  .lg-ai-card {
+    background-image: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lg-btn {
+    transition: none;
+  }
+  .lg-btn:hover,
+  .lg-btn:active {
+    transform: none;
+  }
+}

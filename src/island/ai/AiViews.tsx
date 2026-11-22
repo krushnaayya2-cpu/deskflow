@@ -12,6 +12,8 @@ import { getIcon } from "../../lib/dock";
 import "./ai.css";
 
 export interface AiLook {
+  /** Shared glass classes for the card's surface. */
+  surfaceClass?: string;
   w: number;
   h: number;
   r: number;
@@ -86,7 +88,7 @@ function Btn(props: { children: ReactNode; onClick: () => void; kind: "primary" 
         : { color: props.color };
   return (
     <button type="button" {...stop} onClick={props.onClick}
-      className="shrink-0 rounded-full font-semibold whitespace-nowrap transition-transform hover:scale-105 active:scale-95"
+      className={`shrink-0 rounded-full font-semibold whitespace-nowrap ${props.kind === "primary" ? "lg-btn" : props.kind === "neutral" ? "lg-btn lg-btn-plain" : ""}`}
       style={{ ...st, fontSize: 12.5 * props.s, padding: `${6 * props.s}px ${13 * props.s}px` }}>
       {props.children}
     </button>
@@ -433,11 +435,13 @@ export function noteLook(n: AiNotification, apps: PinnedApp[], accent: string, s
   const t = { app: n.app } as AiTask;
   return {
     w: 470, h: 112, r: 30,
+    // The shared glass material; the gradient border stays, it is what
+    // marks this out as a notification rather than a task card.
+    surfaceClass: "lg-ai-card",
     surface: {
-      background: `linear-gradient(160deg, rgba(24,26,34,0.92), rgba(12,13,18,0.94)) padding-box, linear-gradient(120deg, ${accent}, #a855f7, #22d3ee) border-box`,
+      background: `linear-gradient(160deg, rgba(24,26,34,0.82), rgba(12,13,18,0.86)) padding-box, linear-gradient(120deg, ${accent}, #a855f7, #22d3ee) border-box`,
       border: "1.5px solid transparent",
       color: "#fff",
-      backdropFilter: "blur(24px) saturate(1.4)",
     },
     shadow: `0 0 28px ${accent}44, 0 12px 34px rgba(0,0,0,0.5)`,
     content: (

@@ -126,6 +126,7 @@ export default function Island() {
       .then((c) => {
         cfgRef.current = c;
         setConfig(c);
+        document.documentElement.style.setProperty("--accent", c.appearance.accent);
         diag(`island config: scale=${c.island.scale} style=${c.island.style} hideWhenIdle=${c.island.hideWhenIdle}`);
       })
       .catch((e) => diag(`get_config failed: ${e}`));
@@ -146,7 +147,12 @@ export default function Island() {
         setAiNotes((q) => [...q.slice(-4), n]);
         if (cfgRef.current?.ai.sound) chime();
       }),
-      onConfigChanged((c) => ((cfgRef.current = c), setConfig(c))),
+      onConfigChanged((c) => {
+        cfgRef.current = c;
+        setConfig(c);
+        // Keep the CSS accent in step: the glass layers tint with it.
+        document.documentElement.style.setProperty("--accent", c.appearance.accent);
+      }),
       onState(setSys),
       onHover(setHovered),
       onEvent((e) => {
@@ -426,7 +432,7 @@ export default function Island() {
           onPointerLeave={() => window.clearTimeout(pressTimer.current)}
         >
           <div
-            className={`absolute inset-0 ${liquid ? look.surfaceClass : ""} ${wantsRefract ? "lg-refract" : ""} ${aiCard || themed || mode === "idle" || mode === "compact" ? "" : look.className ?? ""}`}
+            className={`absolute inset-0 ${liquid ? look.surfaceClass : ""} ${liquid ? (mode === "idle" || mode === "compact" ? "lg-island-pill" : "lg-island-panel") : ""} ${aiCard?.surfaceClass ?? ""} ${wantsRefract ? "lg-refract" : ""} ${aiCard || themed || mode === "idle" || mode === "compact" ? "" : look.className ?? ""}`}
             style={{
               ...surface,
               borderRadius: "inherit",
@@ -513,7 +519,7 @@ function Btn(props: { label: string; onClick: () => void; children: ReactNode; s
       title={props.label}
       {...stop}
       onClick={props.onClick}
-      className="isl-hit flex items-center justify-center gap-1.5 rounded-full transition-transform hover:scale-110 active:scale-95"
+      className={`isl-hit flex items-center justify-center gap-1.5 rounded-full ${props.primary ? "lg-btn" : "lg-btn lg-btn-plain"}`}
       style={{
         height: 30 * s,
         minWidth: 30 * s,
